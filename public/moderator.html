@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Moderator — Split Flap Board</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; }
+      body {
+        font-family: Inter, system-ui, sans-serif;
+        background: #09090b;
+        color: #ededf0;
+        min-height: 100vh;
+      }
+      .wrap { max-width: 720px; margin: 0 auto; padding: 24px; }
+      h1 { font-size: 24px; margin-bottom: 6px; }
+      .sub { color: #8a8a96; margin-bottom: 20px; }
+      .card {
+        background: #111114;
+        border: 1px solid #1e1e24;
+        border-radius: 14px;
+        padding: 20px;
+        margin-bottom: 16px;
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        color: #8a8a96;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      input {
+        width: 100%;
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid #1e1e24;
+        background: #09090b;
+        color: #ededf0;
+        font: inherit;
+        margin-bottom: 12px;
+      }
+      button {
+        border: none;
+        border-radius: 10px;
+        padding: 12px 16px;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn-primary { background: #22c55e; color: #041007; width: 100%; }
+      .btn-approve { background: #22c55e; color: #041007; }
+      .btn-reject {
+        background: transparent;
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.35);
+      }
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .status-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+      .pill {
+        font-size: 12px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: #1e1e24;
+        color: #8a8a96;
+      }
+      .pill.on { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+      .pill.off { background: rgba(239, 68, 68, 0.12); color: #ef4444; }
+      .queue-item {
+        border: 1px solid #1e1e24;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        background: #0c0c0f;
+      }
+      .queue-text { white-space: pre-wrap; line-height: 1.5; margin: 10px 0 14px; }
+      .queue-meta { font-size: 12px; color: #8a8a96; }
+      .queue-actions { display: flex; gap: 8px; }
+      .empty { color: #8a8a96; text-align: center; padding: 32px 0; }
+      .error { color: #ef4444; margin-top: 10px; font-size: 14px; }
+      .logout { background: #1e1e24; color: #8a8a96; }
+      #login-screen, #queue-screen { display: none; }
+      #login-screen.active, #queue-screen.active { display: block; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div id="login-screen" class="active">
+        <h1>Moderator Login</h1>
+        <p class="sub">Sign in to approve messages for the board. No pairing codes needed.</p>
+        <div class="card">
+          <form id="login-form">
+            <label for="username">Username</label>
+            <input id="username" autocomplete="username" required />
+            <label for="password">Password</label>
+            <input id="password" type="password" autocomplete="current-password" required />
+            <button class="btn-primary" type="submit">Sign in</button>
+          </form>
+          <div class="error" id="login-error"></div>
+        </div>
+      </div>
+
+      <div id="queue-screen">
+        <div class="toolbar">
+          <div>
+            <h1>Message Queue</h1>
+            <p class="sub">Approved messages show on the board for 20 seconds each.</p>
+          </div>
+          <button class="logout" id="logout-btn">Log out</button>
+        </div>
+        <div class="status-pills">
+          <span class="pill" id="pill-board">Board</span>
+          <span class="pill" id="pill-mod">Moderator</span>
+          <span class="pill" id="pill-display">Display queue: 0</span>
+        </div>
+        <div id="queue-list"></div>
+      </div>
+    </div>
+    <script>
+      const TOKEN_KEY = "moderatorToken";
+      let ws = null;
+      let reconnectTimer = null;
+
+      const loginScreen = document.getElementById("login-screen");
+      const queueScreen = document.getElementById("queue-screen");
+      const queueList = document.getElementById("queue-list");
+      const loginError = document.getElementById("login-error");
+
+      function getToken() {
+        return sessionStorage.getItem(TOKEN_KEY) || "";
+      }
+      function setToken(token) {
+        if (token) sessionStorage.setItem(TOKEN_KEY, token);
+        else sessionStorage.removeItem(TOKEN_KEY);
+      }
+      function showLogin() {
+        queueScreen.classList.remove("active");
+        loginScreen.classList.add("active");
+        disconnectWs();
+      }
+      function showQueue() {
+        loginScreen.classList.remove("active");
+        queueScreen.classList.add("active");
+      }
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+      function formatTime(ts) {
+        return new Date(ts).toLocaleString();
+      }
+      function updateStatus(data) {
+        const boardPill = document.getElementById("pill-board");
+        const modPill = document.getElementById("pill-mod");
+        const displayPill = document.getElementById("pill-display");
+        boardPill.textContent = data.boardOnline ? "Board online" : "Board offline";
+        boardPill.className = "pill " + (data.boardOnline ? "on" : "off");
+        modPill.textContent = data.moderatorOnline ? "Connected" : "Reconnecting…";
+        modPill.className = "pill " + (data.moderatorOnline ? "on" : "off");
+        displayPill.textContent = `Display queue: ${data.display || 0}`;
+      }
+      function renderQueue(items) {
+        if (!items?.length) {
+          queueList.innerHTML = '<div class="empty">No messages waiting for approval.</div>';
+          return;
+        }
+        queueList.innerHTML = items
+          .map(
+            (item) => `
+          <div class="queue-item">
+            <div class="queue-meta">Submitted ${formatTime(item.submittedAt)}</div>
+            <div class="queue-text">${escapeHtml(item.text)}</div>
+            <div class="queue-actions">
+              <button class="btn-approve" data-approve="${item.id}">Approve</button>
+              <button class="btn-reject" data-reject="${item.id}">Reject</button>
+            </div>
+          </div>`,
+          )
+          .join("");
+      }
+      async function api(path, options = {}) {
+        const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+        const token = getToken();
+        if (token) headers.Authorization = `Bearer ${token}`;
+        const res = await fetch(path, { ...options, headers });
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 401) {
+          setToken("");
+          showLogin();
+          throw new Error("Session expired");
+        }
+        return { res, data };
+      }
+      function handleQueueUpdate(data) {
+        updateStatus(data);
+        renderQueue(data.pending || []);
+      }
+      function connectWs() {
+        const token = getToken();
+        if (!token) return;
+        if (ws) try { ws.close(); } catch (_) {}
+        const proto = location.protocol === "https:" ? "wss:" : "ws:";
+        ws = new WebSocket(`${proto}//${location.host}`);
+        ws.onopen = () => {
+          ws.send(JSON.stringify({ type: "authenticate", token }));
+        };
+        ws.onmessage = (e) => {
+          let msg;
+          try { msg = JSON.parse(e.data); } catch (_) { return; }
+          if (msg.type === "authenticated" || msg.type === "queue_update") {
+            handleQueueUpdate(msg);
+          }
+          if (msg.type === "replaced") {
+            alert("Another moderator signed in.");
+            logout();
+          }
+          if (msg.type === "error") {
+            loginError.textContent = msg.message || "Connection error";
+            logout();
+          }
+        };
+        ws.onclose = () => {
+          updateStatus({ boardOnline: false, moderatorOnline: false, display: 0, pending: [] });
+          if (getToken()) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = setTimeout(connectWs, 3000);
+          }
+        };
+      }
+      function disconnectWs() {
+        clearTimeout(reconnectTimer);
+        if (ws) try { ws.close(); } catch (_) {}
+        ws = null;
+      }
+      function logout() {
+        setToken("");
+        showLogin();
+      }
+      document.getElementById("login-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        loginError.textContent = "";
+        try {
+          const res = await fetch("/api/auth/moderator", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              username: document.getElementById("username").value.trim(),
+              password: document.getElementById("password").value,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) throw new Error(data.error || "Login failed");
+          setToken(data.token);
+          showQueue();
+          connectWs();
+        } catch (err) {
+          loginError.textContent = err.message || "Login failed";
+        }
+      });
+      document.getElementById("logout-btn").addEventListener("click", logout);
+      queueList.addEventListener("click", async (e) => {
+        const approveId = e.target.getAttribute("data-approve");
+        const rejectId = e.target.getAttribute("data-reject");
+        try {
+          if (approveId) {
+            await api(`/api/moderator/approve/${approveId}`, { method: "POST" });
+          } else if (rejectId) {
+            await api(`/api/moderator/reject/${rejectId}`, { method: "POST" });
+          } else return;
+          if (ws?.readyState === 1) {
+            ws.send(JSON.stringify({ type: "get_queue" }));
+          } else {
+            const { data } = await api("/api/moderator/queue");
+            handleQueueUpdate(data);
+          }
+        } catch (err) {
+          alert(err.message || "Action failed");
+        }
+      });
+      if (getToken()) {
+        showQueue();
+        connectWs();
+      }
+    </script>
+  </body>
+</html>

@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width,initial-scale=1.0,user-scalable=no"
     />
-    <title>splitflap.org — Board</title>
+    <title>Split Flap Board</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -51,136 +51,64 @@
       }
       html,
       body {
-        width: 100%;
-        height: 100%;
+        width: 6912px;
+        height: 1200px;
         overflow: hidden;
         background: #000;
         font-family: "Inter", sans-serif;
         user-select: none;
       }
 
-      /* Status bar */
-      #status-bar {
+      #submit-qr-panel {
         position: fixed;
-        top: 0;
         left: 0;
-        right: 0;
-        height: 40px;
-        background: rgba(0, 0, 0, 0.88);
-        backdrop-filter: blur(10px);
+        top: 0;
+        width: 1200px;
+        height: 1200px;
+        z-index: 60;
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 16px;
-        z-index: 100;
-        font-size: 11px;
-        color: #555;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-        transition:
-          transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-          opacity 0.4s;
-      }
-      #status-bar.hidden {
-        transform: translateY(-100%);
-        opacity: 0;
+        flex-direction: column;
+        align-items: stretch;
+        background: rgba(0, 0, 0, 0.92);
+        border-right: 1px solid rgba(255, 255, 255, 0.08);
         pointer-events: none;
       }
-      .sb-left {
-        display: flex;
-        align-items: center;
-        gap: 10px;
+      #submit-qr-panel .submit-qr-label {
+        flex: 0 0 auto;
+        padding: 20px 24px 12px;
+        font-size: 22px;
+        color: rgba(255, 255, 255, 0.55);
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        font-weight: 600;
+        text-align: center;
       }
-      .sb-dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        background: #333;
-        transition:
-          background 0.3s,
-          box-shadow 0.3s;
-      }
-      .sb-dot.live {
-        background: #22c55e;
-        box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
-      }
-      .sb-dot.warn {
-        background: #eab308;
-        box-shadow: 0 0 8px rgba(234, 179, 8, 0.3);
-      }
-      .sb-label {
-        font-size: 11px;
-        color: #555;
-        transition: color 0.3s;
-      }
-      .sb-right {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
-      .sb-btn {
-        width: 26px;
-        height: 26px;
-        border-radius: 6px;
+      #submit-qr-container {
+        flex: 1 1 auto;
+        min-height: 0;
         display: flex;
         align-items: center;
         justify-content: center;
-        cursor: pointer;
-        transition: all 0.2s;
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.06);
+        padding: 16px 24px 24px;
       }
-      .sb-btn svg {
-        width: 14px;
-        height: 14px;
+      #submit-qr-container .submit-qr-frame {
+        background: #fff;
+        padding: 16px;
+        border-radius: 16px;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
-      .pwr-btn {
-        color: #333;
-      }
-      .pwr-btn:hover {
-        border-color: rgba(239, 68, 68, 0.4);
-        color: #ef4444;
-        background: rgba(239, 68, 68, 0.08);
-      }
-      .pwr-btn.inactive {
-        opacity: 0.3;
-        pointer-events: none;
-      }
-      .hide-btn {
-        color: #333;
-        background: none;
-        border: none;
-        font-size: 12px;
-      }
-      .hide-btn:hover {
-        color: #888;
-      }
-      #show-bar-dot {
-        position: fixed;
-        top: 10px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 32px;
-        height: 6px;
-        border-radius: 3px;
-        background: rgba(255, 255, 255, 0.08);
-        cursor: pointer;
-        z-index: 99;
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.4s;
-      }
-      #show-bar-dot.visible {
-        opacity: 1;
-        pointer-events: auto;
-      }
-      #show-bar-dot:hover {
-        background: rgba(255, 255, 255, 0.2);
+      #submit-qr-container canvas {
+        display: block;
       }
 
       /* Board */
       .board-area {
-        width: 100%;
-        height: 100%;
+        margin-left: 1200px;
+        width: 5712px;
+        height: 1200px;
         display: flex;
         justify-content: center;
         align-items: center;
@@ -236,254 +164,17 @@
         contain: layout style paint;
       }
 
-      /* ── Pairing overlay ── */
-      #pair-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.95);
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        z-index: 50;
-        transition:
-          opacity 0.5s,
-          visibility 0.5s;
-      }
-      #pair-overlay.hidden {
-        opacity: 0;
-        visibility: hidden;
-        pointer-events: none;
-      }
-      .pair-title {
-        font-size: 13px;
-        color: #444;
-        font-weight: 500;
-        letter-spacing: 1.5px;
-        text-transform: uppercase;
-        margin-bottom: 24px;
-      }
-      #qr-container {
-        background: #fff;
-        padding: 16px;
-        border-radius: 12px;
-        margin-bottom: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      #qr-container canvas {
-        display: block;
-      }
-      .pair-hint {
-        font-size: 12px;
-        color: #333;
-        text-align: center;
-        line-height: 1.7;
-        max-width: 320px;
-        margin-bottom: 16px;
-      }
-      .pair-toggle {
-        font-size: 11px;
-        color: #444;
-        cursor: pointer;
-        padding: 6px 14px;
-        border-radius: 6px;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        transition: all 0.2s;
-        margin-bottom: 12px;
-      }
-      .pair-toggle:hover {
-        background: rgba(255, 255, 255, 0.08);
-        color: #888;
-      }
-      #manual-code-area {
-        display: none;
-        text-align: center;
-        margin-bottom: 12px;
-      }
-      #manual-code-area.show {
-        display: block;
-      }
-      .manual-code {
-        font-family: "Roboto Mono", monospace;
-        font-size: 32px;
-        font-weight: 700;
-        letter-spacing: 6px;
-        color: #fff;
-        padding: 12px 24px;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 10px;
-        display: inline-block;
-      }
-      .manual-hint {
-        font-size: 10px;
-        color: #333;
-        margin-top: 8px;
-      }
-      .pair-url {
-        font-size: 10px;
-        color: #444;
-        font-family: "Roboto Mono", monospace;
-        margin-top: 8px;
-      }
-
-      /* ── Approval overlay ── */
-      #approval-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.92);
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        z-index: 60;
-        opacity: 0;
-        visibility: hidden;
-        transition:
-          opacity 0.3s,
-          visibility 0.3s;
-      }
-      #approval-overlay.show {
-        opacity: 1;
-        visibility: visible;
-      }
-      .approval-icon {
-        width: 64px;
-        height: 64px;
-        border-radius: 50%;
-        background: rgba(234, 179, 8, 0.1);
-        border: 2px solid rgba(234, 179, 8, 0.3);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-bottom: 20px;
-        font-size: 28px;
-      }
-      .approval-title {
-        font-size: 18px;
-        font-weight: 700;
-        color: #fff;
-        margin-bottom: 8px;
-      }
-      .approval-sub {
-        font-size: 13px;
-        color: #555;
-        margin-bottom: 28px;
-        text-align: center;
-        line-height: 1.6;
-      }
-      .approval-btns {
-        display: flex;
-        gap: 12px;
-      }
-      .approval-btns button {
-        padding: 14px 32px;
-        border-radius: 10px;
-        font-size: 14px;
-        font-weight: 600;
-        border: none;
-        cursor: pointer;
-        transition: opacity 0.15s;
-        font-family: "Inter", sans-serif;
-      }
-      .approval-btns button:active {
-        opacity: 0.7;
-      }
-      .btn-approve {
-        background: #22c55e;
-        color: #fff;
-      }
-      .btn-reject {
-        background: rgba(255, 255, 255, 0.06);
-        color: #888;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-      }
-      .approval-kbd {
-        font-size: 11px;
-        color: #333;
-        margin-top: 16px;
-      }
-      .approval-kbd kbd {
-        background: rgba(255, 255, 255, 0.06);
-        padding: 2px 8px;
-        border-radius: 4px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        font-family: "Roboto Mono", monospace;
-        color: #666;
-      }
     </style>
     <style id="dynamic-board-css"></style>
   </head>
   <body>
-    <div id="status-bar">
-      <div class="sb-left">
-        <div class="sb-dot" id="ws-dot"></div>
-        <span class="sb-label" id="ws-label">Connecting...</span>
-      </div>
-      <div class="sb-right">
-        <div
-          class="sb-btn pwr-btn inactive"
-          id="pwr-btn"
-          onclick="kickCompanion()"
-          title="Disconnect companion"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path d="M18.36 6.64a9 9 0 11-12.73 0" />
-            <line x1="12" y1="2" x2="12" y2="12" />
-          </svg>
-        </div>
-        <div class="sb-btn hide-btn" onclick="hideStatusBar()" title="Hide (H)">
-          ✕
-        </div>
-      </div>
-    </div>
-    <div id="show-bar-dot" onclick="showStatusBar()"></div>
-
-    <!-- Pairing -->
-    <div id="pair-overlay">
-      <div class="pair-title">Scan to connect</div>
-      <div id="qr-container"></div>
-      <div class="pair-hint">
-        Scan the QR code with your phone camera to pair instantly.
-      </div>
-      <div class="pair-toggle" onclick="toggleManualCode()">
-        Show manual code
-      </div>
-      <div id="manual-code-area">
-        <div class="manual-code" id="display-code">------</div>
-        <div class="manual-hint">
-          Enter this code on companion.html — TV will ask you to approve.
-        </div>
-      </div>
-      <div class="pair-url" id="companion-url"></div>
-    </div>
-
-    <!-- Approval gate -->
-    <div id="approval-overlay">
-      <div class="approval-icon">📱</div>
-      <div class="approval-title">Device wants to connect</div>
-      <div class="approval-sub">
-        Someone entered your board code manually.<br />Is this you?
-      </div>
-      <div class="approval-btns">
-        <button class="btn-reject" onclick="rejectPair()">Reject</button>
-        <button class="btn-approve" onclick="approvePair()">Approve</button>
-      </div>
-      <div class="approval-kbd">
-        <kbd>Enter</kbd> approve &nbsp; <kbd>Esc</kbd> reject
-      </div>
-    </div>
-
     <div class="board-area" id="board-area">
       <div id="vestaboard-wrapper"></div>
+    </div>
+
+    <div id="submit-qr-panel">
+      <div class="submit-qr-label">Submit a message</div>
+      <div id="submit-qr-container"></div>
     </div>
 
     <script>
@@ -510,12 +201,12 @@
         animPerspective: 3000,
         animStagger: 40,
         animEasing: "ease-in-out",
-        msgDelay: 6000,
+        msgDelay: 20000,
         fastSpeed: 25,
         loopSequence: true,
         soundVolume: 0.8,
         soundRate: 1.5,
-        cols: 22,
+        cols: 96,
         rows: 5,
         scale: 0.22,
         gridGap: 11,
@@ -568,26 +259,13 @@
         g_bot3: "#0f0f0f",
         autoFit: true,
       };
-      let messagesText = "",
-        boardMode = "messages",
-        companionConnected = false,
-        clockInterval = null,
-        weatherInterval = null,
-        weatherFlipInterval = null,
-        weatherRequestId = 0,
-        lastWeatherData = null,
-        weatherPoint = { latitude: 35.3394, longitude: -97.3500 },
-        weatherStation = "",
-        weatherPointRefreshPending = false,
-        weatherPeriodIndex = 0,
-        isLocked = false;
-      let pendingApproval = false;
+      let publicDisplayMs = 20000,
+        publicQueuePlaying = false,
+        publicQueueTimer = null;
 
       const boardWrapper = document.getElementById("vestaboard-wrapper");
       const boardArea = document.getElementById("board-area");
       const dynamicCSS = document.getElementById("dynamic-board-css");
-      const pairOverlay = document.getElementById("pair-overlay");
-      const approvalOverlay = document.getElementById("approval-overlay");
 
       // ═══════════════════════════════════
       // AUDIO
@@ -687,17 +365,26 @@
       // BOARD
       // ═══════════════════════════════════
       let currentChars = [],
-        currentMsgIdx = -1,
-        sequenceTimer = null,
         isFlipping = false,
         cellCache = [];
-      function parseMessages() {
-        return messagesText
-          .split(/\n---\n|\n---$|^---\n/)
-          .filter((m) => m.trim() !== "");
+      function wrapMessageToRows(msg, cols, maxRows = Infinity) {
+        const result = [];
+        for (const line of msg.split("\n")) {
+          const chars = Array.from(line);
+          if (chars.length === 0) {
+            result.push("");
+            if (result.length >= maxRows) return result.slice(0, maxRows);
+            continue;
+          }
+          for (let i = 0; i < chars.length; i += cols) {
+            result.push(chars.slice(i, i + cols).join(""));
+            if (result.length >= maxRows) return result.slice(0, maxRows);
+          }
+        }
+        return result;
       }
       function messageToGrid(msg) {
-        const lines = msg.split("\n"),
+        const lines = wrapMessageToRows(msg, S.cols, S.rows),
           g = [];
         for (let r = 0; r < S.rows; r++) {
           let c = Array.from((lines[r] || "").toUpperCase());
@@ -952,416 +639,8 @@
         startAnimLoop();
       }
 
-      function playSequence() {
-        stopLiveModes();
-        if (sequenceTimer) {
-          clearTimeout(sequenceTimer);
-          sequenceTimer = null;
-        }
-        const msgs = parseMessages();
-        if (!msgs.length) return;
-        function go(i) {
-          if (i >= msgs.length) {
-            if (S.loopSequence) setTimeout(() => go(0), S.msgDelay);
-            return;
-          }
-          currentMsgIdx = i;
-          flipToTarget(messageToGrid(msgs[i]), () => {
-            sequenceTimer = setTimeout(() => go(i + 1), S.msgDelay);
-          });
-        }
-        if (currentMsgIdx !== -1) {
-          cancelAnimLoop();
-          isFlipping = false;
-          currentMsgIdx = -1;
-          flipToTarget(blankGrid(), () => {
-            setTimeout(() => go(0), S.msgDelay);
-          });
-        } else go(0);
-      }
-      function flipToNext() {
-        stopLiveModes();
-        const msgs = parseMessages();
-        if (!msgs.length) return;
-        currentMsgIdx = (currentMsgIdx + 1) % msgs.length;
-        flipToTarget(messageToGrid(msgs[currentMsgIdx]));
-      }
-      function resetBoard() {
-        stopLiveModes();
-        if (sequenceTimer) {
-          clearTimeout(sequenceTimer);
-          sequenceTimer = null;
-        }
-        cancelAnimLoop();
-        isFlipping = false;
-        currentMsgIdx = -1;
-        flipToTarget(blankGrid());
-      }
-      function clearClockTimer() {
-        if (clockInterval) {
-          clearInterval(clockInterval);
-          clockInterval = null;
-        }
-      }
-      function clearWeatherTimer() {
-        if (weatherInterval) {
-          clearInterval(weatherInterval);
-          weatherInterval = null;
-        }
-        if (weatherFlipInterval) {
-          clearInterval(weatherFlipInterval);
-          weatherFlipInterval = null;
-        }
-        weatherRequestId++;
-        weatherPeriodIndex = 0;
-      }
-      function updateWeatherFlipInterval() {
-        if (weatherFlipInterval) {
-          clearInterval(weatherFlipInterval);
-          weatherFlipInterval = null;
-        }
-        if (boardMode !== "weather") return;
-        weatherFlipInterval = setInterval(() => {
-          advanceWeatherPeriod();
-        }, Math.max(4000, S.msgDelay));
-      }
-      function stopClock() {
-        clearClockTimer();
-        if (boardMode === "clock") boardMode = "messages";
-      }
-      function stopWeather() {
-        clearWeatherTimer();
-        if (boardMode === "weather") boardMode = "messages";
-      }
-      function stopLiveModes() {
-        clearClockTimer();
-        clearWeatherTimer();
-        if (boardMode === "clock" || boardMode === "weather")
-          boardMode = "messages";
-      }
-      function centerLine(text) {
-        const line = Array.from((text || "").toUpperCase().trim()).slice(0, S.cols).join("");
-        return line
-          .padStart(Math.floor((S.cols + line.length) / 2))
-          .padEnd(S.cols);
-      }
-      function textToCenteredGrid(contentLines) {
-        const lines = Array(S.rows).fill("");
-        const visible = contentLines
-          .map((line) => (line || "").trim())
-          .filter(Boolean)
-          .slice(0, S.rows);
-        const start = Math.max(0, Math.floor((S.rows - visible.length) / 2));
-        visible.forEach((line, idx) => {
-          lines[start + idx] = centerLine(line);
-        });
-        return messageToGrid(lines.join("\n"));
-      }
-      function wrapWeatherText(text, maxLines) {
-        const clean = (text || "")
-          .toUpperCase()
-          .replace(/[^A-Z0-9/% .,-]/g, " ")
-          .replace(/\s+/g, " ")
-          .trim();
-        if (!clean) return [];
-        const words = clean.split(" ");
-        const lines = [];
-        let current = "";
-        words.forEach((word) => {
-          const next = current ? `${current} ${word}` : word;
-          if (next.length <= S.cols) {
-            current = next;
-            return;
-          }
-          if (current) lines.push(current);
-          current = word.length > S.cols ? word.slice(0, S.cols) : word;
-        });
-        if (current && lines.length < maxLines) lines.push(current);
-        if (lines.length > maxLines) return lines.slice(0, maxLines);
-        if (lines.length === maxLines && words.length) {
-          const last = lines[maxLines - 1];
-          if (last.length > S.cols) lines[maxLines - 1] = last.slice(0, S.cols);
-        }
-        return lines;
-      }
-      function formatWeatherWind(dir, speed) {
-        const raw = `${dir || ""} ${speed || ""}`
-          .toUpperCase()
-          .replace(/\s+/g, " ")
-          .trim();
-        if (!raw) return "";
-        return raw.replace(/\s*MPH/g, "MPH");
-      }
-      function formatWeatherBearing(degrees) {
-        if (typeof degrees !== "number") return "";
-        const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
-        return dirs[Math.round(degrees / 45) % 8];
-      }
-      function formatWeatherTime(value) {
-        if (!value) return "";
-        const d = new Date(value);
-        if (Number.isNaN(d.getTime())) return "";
-        const h = d.getHours() % 12 || 12;
-        const m = String(d.getMinutes()).padStart(2, "0");
-        const ampm = d.getHours() >= 12 ? "PM" : "AM";
-        return `${h}:${m}${ampm}`;
-      }
-      function renderWeatherState(lines) {
-        flipToTarget(textToCenteredGrid(lines));
-      }
-      function weatherAlertHeader() {
-        if (S.cols >= 9) return "🟥 ALERT 🟥";
-        if (S.cols >= 7) return "🟥ALERT🟥";
-        return "ALERT";
-      }
-      function getWeatherSlides(data) {
-        const slides = [];
-        const alerts = Array.isArray(data?.alerts) ? data.alerts : [];
-        const activeAlert = alerts.find(
-          (alert) => alert?.title || alert?.event,
-        );
-        if (activeAlert) {
-          slides.push({
-            type: "alert",
-            alert: activeAlert,
-          });
-        }
-        if (data?.current) {
-          slides.push({
-            type: "current",
-            current: data.current,
-          });
-        }
-        const periods = Array.isArray(data?.periods) ? data.periods : [];
-        periods.forEach((period) => {
-          slides.push({
-            type: "period",
-            period,
-          });
-        });
-        return slides;
-      }
-      function renderWeatherPeriod(data, index) {
-        lastWeatherData = data;
-        const slides = getWeatherSlides(data);
-        if (!slides.length) {
-          renderWeatherState(["WEATHER", "UNAVAILABLE"]);
-          return;
-        }
-        const safeIndex = ((index % slides.length) + slides.length) % slides.length;
-        weatherPeriodIndex = safeIndex;
-        const slide = slides[safeIndex];
-        if (slide?.type === "alert") {
-          const alert = slide.alert || {};
-          const severity = (alert.severity || "").toUpperCase();
-          const instruction = (alert.instruction || "").toUpperCase().split(";")[0].trim();
-          const updated = formatWeatherTime(alert.effective || alert.expires);
-          const lines = [
-            weatherAlertHeader(),
-            ...wrapWeatherText(
-              alert.title || alert.event || "WEATHER ALERT",
-              S.rows >= 5 ? 2 : 1,
-            ),
-            severity || "ACTIVE",
-          ];
-          if (S.rows >= 5 && instruction) lines.push(instruction);
-          else if (S.rows >= 4 && updated) lines.push(updated);
-          renderWeatherState(lines);
-          return;
-        }
-        if (slide?.type === "current") {
-          const current = slide.current || {};
-          const temp = current.temperature != null
-            ? `${current.temperature}${current.temperatureUnit || "F"}`
-            : "";
-          const condition = current.text || "CURRENT CONDITIONS";
-          const windDir = formatWeatherBearing(current.windDirection);
-          const wind = current.windSpeed != null
-            ? `${windDir ? `${windDir} ` : ""}${current.windSpeed}MPH`
-            : "";
-          const humidity = current.humidity != null ? `${current.humidity}% HUM` : "";
-          const updated = formatWeatherTime(current.timestamp);
-          const lines = [
-            current.stationName || current.station || "NOW",
-            ...wrapWeatherText(condition, S.rows >= 5 ? 2 : 1),
-            [temp, wind].filter(Boolean).join("  ") || "OBSERVATION",
-          ];
-          if (S.rows >= 5 && humidity) lines.push(humidity);
-          else if (S.rows >= 4 && updated) lines.push(updated);
-          renderWeatherState(lines);
-          return;
-        }
-        const period = slide?.period || {};
-        const precip = period.probabilityOfPrecipitation;
-        const stats = [
-          period.temperature != null
-            ? `${period.temperature}${period.temperatureUnit || "F"}`
-            : "",
-          precip != null ? `${precip}% RAIN` : "",
-        ]
-          .filter(Boolean)
-          .join("  ");
-        const wind = formatWeatherWind(period.windDirection, period.windSpeed);
-        const updated = formatWeatherTime(data?.updatedAt);
-        const lines = [
-          period.name || "WEATHER",
-          ...wrapWeatherText(
-            period.shortForecast || "NO FORECAST",
-            S.rows >= 5 ? 2 : 1,
-          ),
-          stats || wind || "FORECAST UNAVAILABLE",
-        ];
-        if (S.rows >= 5 && wind) lines.push(wind);
-        else if (S.rows >= 5 && updated) lines.push(`UPDATED ${updated}`);
-        else if (S.rows >= 4 && updated) lines.push(updated);
-        renderWeatherState(lines);
-      }
-      function advanceWeatherPeriod() {
-        const slides = getWeatherSlides(lastWeatherData);
-        if (slides.length < 2 || boardMode !== "weather") return;
-        renderWeatherPeriod(lastWeatherData, weatherPeriodIndex + 1);
-      }
-      async function fetchAndRenderWeather(requestId) {
-        try {
-          const params = new URLSearchParams({
-            lat: weatherPoint.latitude,
-            lon: weatherPoint.longitude,
-          });
-          if (weatherStation) params.set("station", weatherStation);
-          if (weatherPointRefreshPending) params.set("refresh", "1");
-          const res = await fetch(`/api/weather?${params}`, { cache: "no-store" });
-          if (!res.ok) throw new Error(`Weather ${res.status}`);
-          const data = await res.json();
-          if (requestId !== weatherRequestId || boardMode !== "weather") return;
-          if (!data?.ok) throw new Error(data?.error || "Weather unavailable");
-          weatherPointRefreshPending = false;
-          renderWeatherPeriod(data, 0);
-        } catch (_) {
-          if (requestId !== weatherRequestId || boardMode !== "weather") return;
-          lastWeatherData = null;
-          renderWeatherState(["WEATHER", "UNAVAILABLE"]);
-        }
-      }
-      function startClock() {
-        stopLiveModes();
-        boardMode = "clock";
-        function tick() {
-          const now = new Date(),
-            h = now.getHours(),
-            m = now.getMinutes(),
-            s = now.getSeconds();
-          const h12 = h % 12 || 12,
-            ampm = h >= 12 ? "PM" : "AM";
-          const days = [
-            "SUNDAY",
-            "MONDAY",
-            "TUESDAY",
-            "WEDNESDAY",
-            "THURSDAY",
-            "FRIDAY",
-            "SATURDAY",
-          ];
-          const months = [
-            "JAN",
-            "FEB",
-            "MAR",
-            "APR",
-            "MAY",
-            "JUN",
-            "JUL",
-            "AUG",
-            "SEP",
-            "OCT",
-            "NOV",
-            "DEC",
-          ];
-          const timeStr = `${String(h12).padStart(2, " ")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")} ${ampm}`;
-          const dateStr = `${days[now.getDay()]}  ${months[now.getMonth()]} ${now.getDate()}`;
-          let lines = [];
-          for (let r = 0; r < S.rows; r++) lines.push("");
-          const mid = Math.floor(S.rows / 2);
-          lines[mid] = timeStr
-            .padStart(Math.floor((S.cols + timeStr.length) / 2))
-            .padEnd(S.cols);
-          if (mid - 1 >= 0)
-            lines[mid - 1] = dateStr
-              .padStart(Math.floor((S.cols + dateStr.length) / 2))
-              .padEnd(S.cols);
-          if (mid + 1 < S.rows) {
-            const y = String(now.getFullYear());
-            lines[mid + 1] = y
-              .padStart(Math.floor((S.cols + y.length) / 2))
-              .padEnd(S.cols);
-          }
-          const grid = [];
-          for (let r = 0; r < S.rows; r++) {
-            let ch = Array.from((lines[r] || "").toUpperCase());
-            while (ch.length < S.cols) ch.push(" ");
-            grid.push(...ch.slice(0, S.cols));
-          }
-          flipToTarget(grid);
-        }
-        tick();
-        clockInterval = setInterval(tick, 1000);
-      }
-      function startWeather() {
-        stopLiveModes();
-        boardMode = "weather";
-        renderWeatherState(["WEATHER", "LOADING..."]);
-        const requestId = ++weatherRequestId;
-        fetchAndRenderWeather(requestId);
-        updateWeatherFlipInterval();
-        weatherInterval = setInterval(() => {
-          fetchAndRenderWeather(requestId);
-        }, 10 * 60 * 1000);
-      }
-      function setWeatherPoint(point, refresh) {
-        if (!point) return;
-        const latitude = Number(point.latitude);
-        const longitude = Number(point.longitude);
-        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
-        const next = {
-          latitude: Number(latitude.toFixed(4)),
-          longitude: Number(longitude.toFixed(4)),
-        };
-        const changed =
-          next.latitude !== weatherPoint.latitude ||
-          next.longitude !== weatherPoint.longitude;
-        weatherPoint = next;
-        if (refresh && changed) weatherPointRefreshPending = true;
-      }
-      function setWeatherStation(station, refresh) {
-        const next =
-          typeof station === "string"
-            ? station.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12)
-            : "";
-        const changed = next !== weatherStation;
-        weatherStation = next;
-        if (refresh && changed) weatherPointRefreshPending = true;
-      }
-      function flipSystemMessage(text) {
-        stopLiveModes();
-        if (sequenceTimer) {
-          clearTimeout(sequenceTimer);
-          sequenceTimer = null;
-        }
-        cancelAnimLoop();
-        isFlipping = false;
-        currentMsgIdx = -1;
-        const lines = text.split("\n");
-        let msg = "";
-        for (let r = 0; r < S.rows; r++) {
-          const l = lines[r] || "";
-          const pad = l
-            .padStart(Math.floor((S.cols + l.length) / 2))
-            .padEnd(S.cols);
-          msg += (r > 0 ? "\n" : "") + pad.slice(0, S.cols);
-        }
-        flipToTarget(messageToGrid(msg));
-      }
-
       // ═══════════════════════════════════
-      // CSS BUILDER (same as before)
+      // CSS BUILDER
       // ═══════════════════════════════════
       function buildCornerArcs(w, h, r) {
         const p = (v) => v.toFixed(1) + "px";
@@ -1443,11 +722,8 @@
           clearTimeout(rebuildTimeout);
           rebuildTimeout = setTimeout(() => {
             currentChars = blankGrid();
-            currentMsgIdx = -1;
             renderBoard();
             dynamicCSS.textContent = buildDynamicCSS();
-            if (boardMode === "weather" && lastWeatherData)
-              renderWeatherPeriod(lastWeatherData, weatherPeriodIndex);
             if (S.autoFit) applyAutoFit();
             requestAnimationFrame(() => {
               boardWrapper.classList.remove("fading");
@@ -1471,7 +747,7 @@
             bh = grid.offsetHeight;
           if (!bw || !bh) return;
           const rect = boardArea.getBoundingClientRect();
-          const fr = Math.min((rect.width - 32) / bw, (rect.height - 32) / bh);
+          const fr = Math.min(rect.width / bw, rect.height / bh);
           boardWrapper.style.width = bw + "px";
           boardWrapper.style.height = bh + "px";
           boardWrapper.style.transform = `scale(${Math.min(fr, 2)})`;
@@ -1479,19 +755,18 @@
       }
       window.addEventListener("resize", () => {
         if (S.autoFit) requestAnimationFrame(applyAutoFit);
+        requestAnimationFrame(generateSubmitQR);
       });
 
       // ═══════════════════════════════════
       // QR CODE
       // ═══════════════════════════════════
-      function generateQR(url) {
-        const container = document.getElementById("qr-container");
+      function drawQR(container, url, size, useFrame) {
         container.innerHTML = "";
         const qr = qrcode(0, "M");
         qr.addData(url);
         qr.make();
-        const size = 200,
-          mods = qr.getModuleCount(),
+        const mods = qr.getModuleCount(),
           cellSize = size / mods;
         const canvas = document.createElement("canvas");
         canvas.width = size;
@@ -1510,96 +785,64 @@
                 cellSize + 0.5,
               );
           }
-        container.appendChild(canvas);
+        const parent = useFrame
+          ? (() => {
+              const frame = document.createElement("div");
+              frame.className = "submit-qr-frame";
+              container.appendChild(frame);
+              return frame;
+            })()
+          : container;
+        parent.appendChild(canvas);
       }
 
-      // ═══════════════════════════════════
-      // PAIRING / APPROVAL / LOCK
-      // ═══════════════════════════════════
-      function hideStatusBar() {
-        document.getElementById("status-bar").classList.add("hidden");
-        document.getElementById("show-bar-dot").classList.add("visible");
-      }
-      function showStatusBar() {
-        document.getElementById("status-bar").classList.remove("hidden");
-        document.getElementById("show-bar-dot").classList.remove("visible");
-      }
-      function toggleManualCode() {
-        document.getElementById("manual-code-area").classList.toggle("show");
+      function generateSubmitQR() {
+        const container = document.getElementById("submit-qr-container");
+        const url = `${location.origin}/submit.html`;
+        const panel = document.getElementById("submit-qr-panel");
+        const pad = 80;
+        const size = Math.max(
+          320,
+          Math.min(
+            panel.clientWidth - pad,
+            panel.clientHeight - pad - 60,
+          ),
+        );
+        drawQR(container, url, size, true);
       }
 
-      function setCompanionState(on) {
-        companionConnected = on;
-        isLocked = on;
-        document.getElementById("pwr-btn").classList.toggle("inactive", !on);
-        const dot = document.getElementById("ws-dot"),
-          lbl = document.getElementById("ws-label");
-        if (on) {
-          lbl.textContent = "Companion connected";
-          lbl.style.color = "#22c55e";
-          dot.className = "sb-dot live";
-        } else {
-          lbl.textContent = "No companion";
-          lbl.style.color = "#555";
-          dot.className = "sb-dot";
+      function clearPublicQueueTimer() {
+        if (publicQueueTimer) {
+          clearTimeout(publicQueueTimer);
+          publicQueueTimer = null;
         }
       }
 
-      function showPairScreen(code, secret) {
-        const url = `${location.origin}/companion.html#${code}.${secret}`;
-        generateQR(url);
-        document.getElementById("display-code").textContent = code;
-        document.getElementById("companion-url").textContent =
-          location.origin + "/companion.html";
-        pairOverlay.classList.remove("hidden");
-      }
-      function hidePairScreen() {
-        pairOverlay.classList.add("hidden");
+      function finishPublicMessage(id) {
+        publicQueuePlaying = false;
+        clearPublicQueueTimer();
+        if (ws && ws.readyState === 1) {
+          ws.send(JSON.stringify({ type: "public_message_done", id }));
+        }
       }
 
-      function showApproval() {
-        pendingApproval = true;
-        approvalOverlay.classList.add("show");
-      }
-      function hideApproval() {
-        pendingApproval = false;
-        approvalOverlay.classList.remove("show");
-      }
-
-      function approvePair() {
-        if (!ws || ws.readyState !== 1) return;
-        ws.send(JSON.stringify({ type: "approve_pair" }));
-        hideApproval();
-      }
-      function rejectPair() {
-        if (!ws || ws.readyState !== 1) return;
-        ws.send(JSON.stringify({ type: "reject_pair" }));
-        hideApproval();
+      function playPublicMessage(text, durationMs, id) {
+        publicQueuePlaying = true;
+        clearPublicQueueTimer();
+        const ms = durationMs || publicDisplayMs;
+        flipToTarget(messageToGrid(text.toUpperCase()), () => {
+          publicQueueTimer = setTimeout(() => finishPublicMessage(id), ms);
+        });
       }
 
-      function kickCompanion() {
-        if (!companionConnected || !ws || ws.readyState !== 1) return;
-        ws.send(JSON.stringify({ type: "kick_companion" }));
-      }
-
-      // ═══════════════════════════════════
-      // WEBSOCKET
-      // ═══════════════════════════════════
       let ws = null,
-        boardId = null,
-        boardSecret = null,
         reconnectTimer = null;
 
       function connectWS() {
         const proto = location.protocol === "https:" ? "wss:" : "ws:";
         ws = new WebSocket(`${proto}//${location.host}`);
         ws.onopen = () => {
-          document.getElementById("ws-dot").className = "sb-dot live";
-          if (boardId) {
-            ws.send(JSON.stringify({ type: "reconnect_board", boardId }));
-          } else {
-            ws.send(JSON.stringify({ type: "register_board" }));
-          }
+          ws.send(JSON.stringify({ type: "register_board" }));
         };
         ws.onmessage = (e) => {
           let msg;
@@ -1608,129 +851,22 @@
           } catch (_) {
             return;
           }
-          switch (msg.type) {
-            case "registered":
-              boardId = msg.boardId;
-              boardSecret = msg.secret;
-              showPairScreen(boardId, boardSecret);
-              setCompanionState(false);
-              break;
-            case "reconnected":
-              boardId = msg.boardId;
-              boardSecret = msg.secret || boardSecret;
-              if (msg.settings) Object.assign(S, msg.settings);
-              if (msg.messages) messagesText = msg.messages;
-              if (msg.mode) boardMode = msg.mode;
-              if (msg.weatherPoint) setWeatherPoint(msg.weatherPoint, false);
-              setWeatherStation(msg.weatherStation || "", false);
-              applySettings(true);
-              if (boardMode === "clock") startClock();
-              else if (boardMode === "weather") startWeather();
-              if (msg.locked) {
-                setCompanionState(true);
-                hidePairScreen();
-              } else {
-                setCompanionState(false);
-                showPairScreen(boardId, boardSecret);
-              }
-              break;
-            case "pair_request":
-              showApproval();
-              break;
-            case "pair_rejected":
-              hideApproval();
-              break;
-            case "companion_joined":
-              setCompanionState(true);
-              hidePairScreen();
-              hideApproval();
-              getAudioCtx();
-              const pm =
-                S.rows >= 3
-                  ? "\n🟩  DEVICE  PAIRED!  🟩"
-                  : "🟩 DEVICE PAIRED! 🟩";
-              flipSystemMessage(pm);
-              break;
-            case "companion_disconnected":
-              setCompanionState(false);
-              flipSystemMessage("\nDISCONNECTED");
-              break;
-            case "companion_disconnected_new_code":
-              setCompanionState(false);
-              boardId = msg.boardId;
-              boardSecret = msg.secret;
-              flipSystemMessage("\nDISCONNECTED");
-              setTimeout(() => {
-                showPairScreen(boardId, boardSecret);
-              }, 2500);
-              break;
-            case "new_code":
-              boardId = msg.boardId;
-              boardSecret = msg.secret;
-              showPairScreen(boardId, boardSecret);
-              setCompanionState(false);
-              break;
-            case "update_settings":
-              if (msg.settings && typeof msg.settings === "object") {
-                Object.assign(S, msg.settings);
-                applySettings();
-                if (Object.prototype.hasOwnProperty.call(msg.settings, "msgDelay"))
-                  updateWeatherFlipInterval();
-              }
-              break;
-            case "update_messages":
-              if (typeof msg.messages === "string") messagesText = msg.messages;
-              break;
-            case "play_sequence":
-              playSequence();
-              break;
-            case "next_message":
-              flipToNext();
-              break;
-            case "reset_board":
-              resetBoard();
-              break;
-            case "set_mode":
-              if (msg.weatherPoint) setWeatherPoint(msg.weatherPoint, true);
-              setWeatherStation(msg.weatherStation || "", true);
-              if (msg.mode === "clock") startClock();
-              else if (msg.mode === "weather") startWeather();
-              else {
-                stopLiveModes();
-                boardMode = "messages";
-              }
-              break;
-            case "flip_message":
-              if (typeof msg.text === "string")
-                flipToTarget(messageToGrid(msg.text.toUpperCase()));
-              break;
+          if (msg.type === "registered") {
+            generateSubmitQR();
+          }
+          if (msg.type === "play_public_message" && typeof msg.text === "string") {
+            getAudioCtx();
+            playPublicMessage(msg.text, msg.durationMs, msg.id);
           }
         };
         ws.onclose = () => {
-          document.getElementById("ws-dot").className = "sb-dot warn";
-          document.getElementById("ws-label").textContent = "Reconnecting...";
-          document.getElementById("ws-label").style.color = "#eab308";
           clearTimeout(reconnectTimer);
           reconnectTimer = setTimeout(connectWS, 3000);
         };
-        ws.onerror = () => {
-          ws.close();
-        };
+        ws.onerror = () => ws.close();
       }
 
-      // ═══════════════════════════════════
-      // KEYBOARD
-      // ═══════════════════════════════════
       document.addEventListener("keydown", (e) => {
-        // Approval gate shortcuts
-        if (pendingApproval) {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            approvePair();
-          }
-          if (e.key === "Escape") rejectPair();
-          return;
-        }
         if (e.key.toLowerCase() === "f") {
           if (!document.fullscreenElement)
             document.documentElement.requestFullscreen().catch(() => {});
@@ -1739,23 +875,13 @@
         if (e.key.toLowerCase() === "m") {
           S.soundVolume = S.soundVolume > 0 ? 0 : 0.8;
         }
-        if (e.key.toLowerCase() === "h") {
-          const sb = document.getElementById("status-bar");
-          if (sb.classList.contains("hidden")) showStatusBar();
-          else hideStatusBar();
-        }
       });
-      document.addEventListener(
-        "click",
-        () => {
-          getAudioCtx();
-        },
-        { once: true },
-      );
+      document.addEventListener("click", () => getAudioCtx(), { once: true });
 
       renderBoard();
       applySettings(true);
       loadClickWav();
+      generateSubmitQR();
       connectWS();
     </script>
   </body>

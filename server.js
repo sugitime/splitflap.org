@@ -18,738 +18,279 @@ app.use(
   "/api/",
   rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
+    max: 200,
     standardHeaders: true,
     legacyHeaders: false,
   }),
 );
 app.use(express.static(path.join(__dirname, "public")));
 
-const boards = new Map();
-const BOARD_TTL = 24 * 60 * 60 * 1000;
-const ID_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const DEFAULT_WEATHER_POINT = {
-  latitude: 35.3394,
-  longitude: -97.35,
+const SESSION_TTL = 12 * 60 * 60 * 1000;
+const PUBLIC_MSG_MAX = 500;
+const PUBLIC_DISPLAY_MS = 20000;
+
+const AUTH = {
+  moderator: {
+    username: process.env.MODERATOR_USERNAME || "moderator",
+    password: process.env.MODERATOR_PASSWORD || "moderator123",
+  },
 };
-const WEATHER_CACHE_MS = 10 * 60 * 1000;
-const WEATHER_ALERT_CACHE_MS = 60 * 1000;
-const WEATHER_POINT_CACHE_MS = 60 * 60 * 1000;
-const WEATHER_FETCH_TIMEOUT_MS = 8 * 1000;
-const WEATHER_PERIOD_COUNT = 4;
-const OBSERVATION_STATION_COUNT = 5;
-const weatherCache = new Map();
-const weatherAlertCache = new Map();
-const weatherPointCache = new Map();
 
-function genBoardId() {
-  let id;
-  do {
-    id = "";
-    const bytes = crypto.randomBytes(6);
-    for (let i = 0; i < 6; i++) id += ID_CHARS[bytes[i] % ID_CHARS.length];
-  } while (boards.has(id));
-  return id;
+const sessions = new Map();
+let boardWs = null;
+let moderatorWs = null;
+const submissionQueue = [];
+const displayQueue = [];
+
+function genToken() {
+  return crypto.randomBytes(32).toString("hex");
 }
 
-function genSecret() {
-  return crypto.randomBytes(16).toString("hex"); // 32 hex chars
+function genMessageId() {
+  return crypto.randomBytes(8).toString("hex");
 }
 
-async function fetchWeatherGovJson(url) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), WEATHER_FETCH_TIMEOUT_MS);
-  timeout.unref?.();
-
-  try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        Accept: "application/geo+json, application/json",
-        "User-Agent": "splitflap.org weather proxy",
-      },
-    });
-    if (!res.ok) {
-      throw new Error(`Weather API ${res.status}`);
-    }
-    return await res.json();
-  } catch (err) {
-    if (err?.name === "AbortError") {
-      throw new Error(`Weather API timeout after ${WEATHER_FETCH_TIMEOUT_MS}ms`);
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-function normalizeWeatherPoint(rawLatitude, rawLongitude) {
-  if (rawLatitude === undefined || rawLongitude === undefined) return null;
-  const latitude = Number(rawLatitude);
-  const longitude = Number(rawLongitude);
-  
-  if (
-    !Number.isFinite(latitude) ||
-    !Number.isFinite(longitude) ||
-    latitude < -90 ||
-    latitude > 90 ||
-    longitude < -180 ||
-    longitude > 180
-  ) {
+function getSession(token) {
+  if (typeof token !== "string" || !token) return null;
+  const s = sessions.get(token);
+  if (!s || s.expiresAt < Date.now()) {
+    sessions.delete(token);
     return null;
   }
+  return s;
+}
+
+function authMiddleware(req, res, next) {
+  const header = req.headers.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+  const session = getSession(token);
+  if (!session || session.role !== "moderator") {
+    res.status(401).json({ ok: false, error: "Unauthorized" });
+    return;
+  }
+  req.session = session;
+  next();
+}
+
+function safeSend(ws, obj) {
+  if (ws && ws.readyState === 1) {
+    try {
+      ws.send(JSON.stringify(obj));
+    } catch (_) {}
+  }
+}
+
+function normalizeMessage(text) {
+  if (typeof text !== "string") return "";
+  return text.replace(/\r\n/g, "\n").trim().slice(0, PUBLIC_MSG_MAX);
+}
+
+function queueSnapshot() {
   return {
-    latitude: Number(latitude.toFixed(4)),
-    longitude: Number(longitude.toFixed(4)),
+    pending: submissionQueue.map((m) => ({
+      id: m.id,
+      text: m.text,
+      submittedAt: m.submittedAt,
+    })),
+    display: displayQueue.length,
+    boardOnline: !!(boardWs && boardWs.readyState === 1),
+    moderatorOnline: !!(moderatorWs && moderatorWs.readyState === 1),
   };
 }
 
-function weatherPointKey(point) {
-  return `${point.latitude},${point.longitude}`;
+function notifyModerator() {
+  safeSend(moderatorWs, { type: "queue_update", ...queueSnapshot() });
 }
 
-function normalizeWeatherStation(rawStation) {
-  if (typeof rawStation !== "string") return "";
-  return rawStation.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
-}
-
-function weatherDataKey(point, stationId) {
-  return `${weatherPointKey(point)}:${stationId || ""}`;
-}
-
-function getStationDistanceMiles(feature) {
-  const distance = feature?.properties?.distance;
-  const value = Number(distance?.value);
-  if (!Number.isFinite(value)) return null;
-  const unitCode = String(distance?.unitCode || "").toLowerCase();
-  if (unitCode.includes("km")) return Number((value * 0.621371).toFixed(1));
-  if (unitCode.includes(":m") || unitCode.endsWith("/m")) {
-    return Number((value / 1609.344).toFixed(1));
-  }
-  return Number((value * 0.621371).toFixed(1));
-}
-
-function clearWeatherPointCaches(point) {
-  const key = weatherPointKey(point);
-  for (const cacheKey of weatherCache.keys()) {
-    if (cacheKey === key || cacheKey.startsWith(`${key}:`)) weatherCache.delete(cacheKey);
-  }
-  weatherAlertCache.delete(key);
-  weatherPointCache.delete(key);
-}
-
-function convertTemperature(value, unitCode) {
-  if (typeof value !== "number") return null;
-  if (String(unitCode).toLowerCase().includes("degc")) {
-    return Math.round((value * 9) / 5 + 32);
-  }
-  return Math.round(value);
-}
-
-function convertWindSpeed(value, unitCode) {
-  if (typeof value !== "number") return null;
-  const unit = String(unitCode).toLowerCase();
-  if (unit.includes("m_s-1")) return Math.round(value * 2.23694);
-  if (unit.includes("km_h-1")) return Math.round(value * 0.621371);
-  return Math.round(value);
-}
-
-function convertPressure(value, unitCode) {
-  if (typeof value !== "number") return null;
-  if (String(unitCode).toLowerCase().includes("pa")) {
-    return Number((value / 3386.389).toFixed(2));
-  }
-  return Number(value.toFixed(2));
-}
-
-function buildCurrentObservation(observation, station) {
-  const props = observation?.properties || {};
-  const temperature = props.temperature || {};
-  const windSpeed = props.windSpeed || {};
-  const windGust = props.windGust || {};
-  const pressure = props.barometricPressure || {};
-  const humidity = props.relativeHumidity || {};
-  return {
-    station: station.id,
-    stationName: station.name || station.id,
-    stationDistanceMiles: station.distanceMiles,
-    text: props.textDescription || "",
-    temperature: convertTemperature(temperature.value, temperature.unitCode),
-    temperatureUnit: "F",
-    windDirection: typeof props.windDirection?.value === "number"
-      ? Math.round(props.windDirection.value)
-      : null,
-    windSpeed: convertWindSpeed(windSpeed.value, windSpeed.unitCode),
-    windGust: convertWindSpeed(windGust.value, windGust.unitCode),
-    pressure: convertPressure(pressure.value, pressure.unitCode),
-    humidity: typeof humidity.value === "number" ? Math.round(humidity.value) : null,
-    timestamp: props.timestamp || null,
-  };
-}
-
-async function getWeatherPointData(weatherPoint) {
-  const key = weatherPointKey(weatherPoint);
-  const cached = weatherPointCache.get(key);
-  if (cached?.data && cached.expiresAt > Date.now()) return cached.data;
-
-  const { latitude, longitude } = weatherPoint;
-  const pointResponse = await fetchWeatherGovJson(
-    `https://api.weather.gov/points/${latitude},${longitude}`,
-  );
-  const forecastBaseUrl = pointResponse?.properties?.forecast;
-  if (!forecastBaseUrl) throw new Error("Forecast URL missing");
-
-  const stationsUrl = pointResponse?.properties?.observationStations;
-  if (!stationsUrl) throw new Error("Observation stations URL missing");
-
-  const stationsResponse = await fetchWeatherGovJson(stationsUrl);
-  // get the first 5 stations with valid IDs
-  const observationStations = (stationsResponse?.features || [])
-    .map((feature) => ({
-      id: normalizeWeatherStation(feature.properties?.stationIdentifier),
-      name: feature.properties?.name || "",
-      distanceMiles: getStationDistanceMiles(feature),
-    }))
-    .filter((station) => station.id)
-    .slice(0, OBSERVATION_STATION_COUNT);
-
-  const pointData = {
-    latitude,
-    longitude,
-    gridId: pointResponse?.properties?.gridId || "",
-    gridX: pointResponse?.properties?.gridX ?? null,
-    gridY: pointResponse?.properties?.gridY ?? null,
-    forecastUrl: `${forecastBaseUrl}?units=us`,
-    observationStations,
-  };
-  weatherPointCache.set(key, {
-    data: pointData,
-    expiresAt: Date.now() + WEATHER_POINT_CACHE_MS,
+function playNextOnBoard() {
+  if (!boardWs || boardWs.readyState !== 1 || !displayQueue.length) return;
+  const entry = displayQueue[0];
+  safeSend(boardWs, {
+    type: "play_public_message",
+    id: entry.id,
+    text: entry.text,
+    durationMs: PUBLIC_DISPLAY_MS,
   });
-  return pointData;
 }
 
-async function getCurrentWeather(station) {
-  if (!station?.id) return null;
-  const observation = await fetchWeatherGovJson(
-    `https://api.weather.gov/stations/${encodeURIComponent(station.id)}/observations/latest`,
-  );
-  return buildCurrentObservation(observation, station);
+function enqueueDisplay(entry) {
+  displayQueue.push(entry);
+  if (displayQueue.length === 1) playNextOnBoard();
+  notifyModerator();
 }
 
-async function getWeatherAlerts(point) {
-  const now = Date.now();
-  const key = weatherPointKey(point);
-  const cached = weatherAlertCache.get(key);
-  if (cached?.data && cached.expiresAt > now) return cached.data;
-
-  const { latitude, longitude } = point;
-  const alertsResult = await fetchWeatherGovJson(`https://api.weather.gov/alerts/active?status=actual,exercise,system,test,draft&message_type=alert,update&point=${latitude}%2C${longitude}`);
-  const alerts = (alertsResult?.features || []).map((feature) => ({
-    id: feature.id || "",
-    area: feature.properties?.areaDesc || "",
-    title: feature.properties?.headline || "",
-    severity: feature.properties?.severity || "",
-    certainty: feature.properties?.certainty || "",
-    urgency: feature.properties?.urgency || "",
-    event: feature.properties?.event || "",
-    effective: feature.properties?.effective || null,
-    expires: feature.properties?.expires || null,
-    description: feature.properties?.description || "",
-    instruction: feature.properties?.instruction || "",
-  }));
-
-  weatherAlertCache.set(key, {
-    data: alerts,
-    expiresAt: now + WEATHER_ALERT_CACHE_MS,
-  });
-  return alerts;
-}
-
-async function getWeatherData(point, requestedStationId) {
-  const now = Date.now();
-  const stationId = normalizeWeatherStation(requestedStationId);
-  const key = weatherDataKey(point, stationId);
-  const cached = weatherCache.get(key);
-  if (cached?.data && cached.expiresAt > now) {
-    const alerts = await getWeatherAlerts(point);
-    cached.data.alerts = alerts;
-    return cached.data;
+function onPublicMessageDone(id) {
+  if (displayQueue.length && displayQueue[0].id === id) {
+    displayQueue.shift();
+  } else {
+    const idx = displayQueue.findIndex((m) => m.id === id);
+    if (idx !== -1) displayQueue.splice(idx, 1);
   }
-
-  const pointData = await getWeatherPointData(point);
-  const { latitude, longitude } = pointData;
-  const selectedStation = pointData.observationStations.find(
-    (station) => station.id === stationId,
-  );
-
-  const alerts = await getWeatherAlerts(point);
-  const forecast = await fetchWeatherGovJson(pointData.forecastUrl);
-
-  const periods = (forecast?.properties?.periods || [])
-    .slice(0, WEATHER_PERIOD_COUNT)
-    .map((period) => ({
-      name: period.name || "Now",
-      isDaytime: !!period.isDaytime,
-      temperature: period.temperature ?? null,
-      temperatureUnit: period.temperatureUnit || "F",
-      shortForecast: period.shortForecast || "",
-      windSpeed: period.windSpeed || "",
-      windDirection: period.windDirection || "",
-      probabilityOfPrecipitation:
-        period?.probabilityOfPrecipitation?.value ?? null,
-      startTime: period.startTime || null,
-      endTime: period.endTime || null,
-    }));
-  if (!periods.length) throw new Error("Forecast period missing");
-
-  const data = {
-    fetchedAt: new Date().toISOString(),
-    location: {
-      latitude,
-      longitude,
-      gridId: pointData.gridId,
-      gridX: pointData.gridX,
-      gridY: pointData.gridY,
-    },
-    observationStations: pointData.observationStations,
-    weatherStation: selectedStation?.id || "",
-    updatedAt:
-      forecast?.properties?.updateTime || forecast?.properties?.generatedAt || null,
-    alerts,
-    current: selectedStation ? await getCurrentWeather(selectedStation).catch(() => null)
-      : null,
-    periods,
-  };
-
-  weatherCache.set(key, {
-    data,
-    expiresAt: now + WEATHER_CACHE_MS,
-  });
-  return data;
+  playNextOnBoard();
+  notifyModerator();
 }
 
-setInterval(
-  () => {
-    const now = Date.now();
-    for (const [id, b] of boards) {
-      if (now - b.lastActive > BOARD_TTL) {
-        try {
-          if (b.boardWs) b.boardWs.close();
-        } catch (_) {}
-        try {
-          if (b.companionWs) b.companionWs.close();
-        } catch (_) {}
-        boards.delete(id);
-      }
-    }
-  },
-  5 * 60 * 1000,
-);
-
-app.get("/api/health", (_, res) => res.json({ ok: true, boards: boards.size }));
-
-app.get("/api/weather", async (req, res) => {
-  try {
-    const point = normalizeWeatherPoint(req.query.lat, req.query.lon);
-    if (!point) {
-      res.status(400).json({ ok: false, error: "Invalid weather coordinates" });
-      return;
-    }
-    if (req.query.refresh === "1") clearWeatherPointCaches(point);
-    const data = await getWeatherData(point, req.query.station);
-    res.json({ ok: true, ...data });
-  } catch (err) {
-    res.status(502).json({
-      ok: false,
-      error: err instanceof Error ? err.message : "Weather unavailable",
-    });
-  }
+app.get("/api/health", (_, res) => {
+  res.json({
+    ok: true,
+    boardOnline: !!(boardWs && boardWs.readyState === 1),
+    pending: submissionQueue.length,
+    display: displayQueue.length,
+  });
 });
 
-app.get("/api/weather/point", async (req, res) => {
-  try {
-    const point = normalizeWeatherPoint(req.query.lat, req.query.lon);
-    if (!point) {
-      res.status(400).json({ ok: false, error: "Invalid weather coordinates" });
+app.post("/api/auth/moderator", (req, res) => {
+  const { username, password } = req.body || {};
+  if (
+    username === AUTH.moderator.username &&
+    password === AUTH.moderator.password
+  ) {
+    const token = genToken();
+    sessions.set(token, {
+      role: "moderator",
+      expiresAt: Date.now() + SESSION_TTL,
+    });
+    res.json({ ok: true, token });
+    return;
+  }
+  res.status(401).json({ ok: false, error: "Invalid credentials" });
+});
+
+app.post(
+  "/api/submit-message",
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+  }),
+  (req, res) => {
+    const text = normalizeMessage(req.body?.text);
+    if (!text) {
+      res.status(400).json({ ok: false, error: "Message is required" });
       return;
     }
-    if (req.query.refresh === "1") clearWeatherPointCaches(point);
-    const pointData = await getWeatherPointData(point);
-    res.json({
-      ok: true,
-      location: {
-        latitude: pointData.latitude,
-        longitude: pointData.longitude,
-        gridId: pointData.gridId,
-        gridX: pointData.gridX,
-        gridY: pointData.gridY,
-      },
-      observationStations: pointData.observationStations,
-    });
-  } catch (err) {
-    res.status(502).json({
-      ok: false,
-      error: err instanceof Error ? err.message : "Weather point unavailable",
-    });
+    if (!boardWs || boardWs.readyState !== 1) {
+      res.status(503).json({ ok: false, error: "Board is offline" });
+      return;
+    }
+    const entry = {
+      id: genMessageId(),
+      text,
+      submittedAt: Date.now(),
+    };
+    submissionQueue.push(entry);
+    notifyModerator();
+    res.json({ ok: true, id: entry.id, message: "Submitted for approval" });
+  },
+);
+
+app.get("/api/moderator/queue", authMiddleware, (_, res) => {
+  res.json({ ok: true, ...queueSnapshot() });
+});
+
+app.post("/api/moderator/approve/:id", authMiddleware, (req, res) => {
+  const idx = submissionQueue.findIndex((m) => m.id === req.params.id);
+  if (idx === -1) {
+    res.status(404).json({ ok: false, error: "Message not found" });
+    return;
   }
+  const entry = submissionQueue.splice(idx, 1)[0];
+  entry.approvedAt = Date.now();
+  enqueueDisplay(entry);
+  res.json({ ok: true, message: entry });
+});
+
+app.post("/api/moderator/reject/:id", authMiddleware, (req, res) => {
+  const idx = submissionQueue.findIndex((m) => m.id === req.params.id);
+  if (idx === -1) {
+    res.status(404).json({ ok: false, error: "Message not found" });
+    return;
+  }
+  submissionQueue.splice(idx, 1);
+  notifyModerator();
+  res.json({ ok: true });
 });
 
 wss.on("connection", (ws) => {
   ws.isAlive = true;
-  ws.msgCount = 0;
-  ws.msgWindow = Date.now();
   ws.role = null;
-  ws.boardId = null;
 
   ws.on("pong", () => {
     ws.isAlive = true;
   });
 
   ws.on("message", (raw) => {
-    const now = Date.now();
-    if (now - ws.msgWindow > 60000) {
-      ws.msgCount = 0;
-      ws.msgWindow = now;
-    }
-    if (++ws.msgCount > 120) {
-      safeSend(ws, { type: "error", message: "Rate limited" });
-      return;
-    }
     let msg;
     try {
-      const str = raw.toString();
-      if (str.length > 65536) return;
-      msg = JSON.parse(str);
+      msg = JSON.parse(raw.toString());
     } catch (_) {
       return;
     }
-    if (!msg || typeof msg.type !== "string" || msg.type.length > 64) return;
-    handleMsg(ws, msg);
+    if (!msg || typeof msg.type !== "string") return;
+
+    switch (msg.type) {
+      case "register_board": {
+        if (boardWs && boardWs.readyState === 1) {
+          try {
+            boardWs.close();
+          } catch (_) {}
+        }
+        boardWs = ws;
+        ws.role = "board";
+        safeSend(ws, { type: "registered" });
+        console.log("Board connected");
+        notifyModerator();
+        break;
+      }
+
+      case "authenticate": {
+        const session = getSession(msg.token);
+        if (!session || session.role !== "moderator") {
+          safeSend(ws, { type: "error", message: "Invalid or expired login" });
+          return;
+        }
+        if (moderatorWs && moderatorWs !== ws && moderatorWs.readyState === 1) {
+          safeSend(moderatorWs, { type: "replaced" });
+          try {
+            moderatorWs.close();
+          } catch (_) {}
+        }
+        moderatorWs = ws;
+        ws.role = "moderator";
+        safeSend(ws, { type: "authenticated", ...queueSnapshot() });
+        console.log("Moderator connected (auto-paired)");
+        break;
+      }
+
+      case "public_message_done": {
+        if (ws.role !== "board") return;
+        onPublicMessageDone(msg.id);
+        break;
+      }
+
+      case "get_queue": {
+        if (ws.role !== "moderator") return;
+        safeSend(ws, { type: "queue_update", ...queueSnapshot() });
+        break;
+      }
+    }
   });
 
   ws.on("close", () => {
-    if (!ws.boardId) return;
-    const b = boards.get(ws.boardId);
-    if (!b) return;
-
-    if (b.boardWs === ws) {
-      b.boardWs = null;
-      safeSend(b.companionWs, { type: "board_disconnected" });
+    if (ws === boardWs) {
+      boardWs = null;
+      console.log("Board disconnected");
+      notifyModerator();
     }
-    if (b.companionWs === ws) {
-      b.companionWs = null;
-      safeSend(b.boardWs, { type: "companion_disconnected" });
-    }
-    // Clear pending if the pending companion disconnected
-    if (b.pendingWs === ws) {
-      b.pendingWs = null;
+    if (ws === moderatorWs) {
+      moderatorWs = null;
+      console.log("Moderator disconnected");
     }
   });
+
   ws.on("error", () => {});
 });
-
-function safeSend(ws, obj) {
-  if (ws && ws.readyState === 1)
-    try {
-      ws.send(JSON.stringify(obj));
-    } catch (_) {}
-}
-
-function handleMsg(ws, msg) {
-  switch (msg.type) {
-    // ── Board registers ──
-    case "register_board": {
-      const boardId = genBoardId();
-      const secret = genSecret();
-      boards.set(boardId, {
-        boardWs: ws,
-        companionWs: null,
-        pendingWs: null,
-        secret,
-        settings: null,
-        messages: null,
-        mode: "messages",
-        weatherPoint: DEFAULT_WEATHER_POINT,
-        weatherStation: "",
-        locked: false, // true when companion is connected
-        createdAt: Date.now(),
-        lastActive: Date.now(),
-      });
-      ws.boardId = boardId;
-      ws.role = "board";
-      safeSend(ws, { type: "registered", boardId, secret });
-      console.log(`Board created: ${boardId}`);
-      break;
-    }
-
-    // ── Companion requests pairing ──
-    case "pair": {
-      const id =
-        typeof msg.boardId === "string"
-          ? msg.boardId
-              .toUpperCase()
-              .replace(/[^A-Z0-9]/g, "")
-              .slice(0, 6)
-          : "";
-      const secret =
-        typeof msg.secret === "string"
-          ? msg.secret
-              .replace(/[^a-f0-9]/gi, "")
-              .slice(0, 32)
-              .toLowerCase()
-          : "";
-      if (id.length !== 6) {
-        safeSend(ws, { type: "error", message: "Invalid code" });
-        return;
-      }
-
-      const b = boards.get(id);
-      if (!b) {
-        safeSend(ws, { type: "error", message: "Board not found" });
-        return;
-      }
-      if (!b.boardWs || b.boardWs.readyState !== 1) {
-        safeSend(ws, { type: "error", message: "Board is offline" });
-        return;
-      }
-
-      // If board is locked (already has a companion), reject
-      if (b.locked && b.companionWs && b.companionWs.readyState === 1) {
-        safeSend(ws, {
-          type: "error",
-          message: "Board is locked. Disconnect current companion first.",
-        });
-        return;
-      }
-
-      // Check if secret matches (QR code path) → auto-approve
-      if (secret.length === 32 && secret === b.secret) {
-        completePairing(b, ws, id);
-        return;
-      }
-
-      // Manual code path → require board-side approval
-      // Store as pending, ask board to approve
-      if (b.pendingWs) {
-        safeSend(b.pendingWs, {
-          type: "error",
-          message: "Another device is waiting for approval",
-        });
-      }
-      b.pendingWs = ws;
-      ws.boardId = id; // tentative
-      safeSend(ws, {
-        type: "waiting_approval",
-        message: "Waiting for TV to approve...",
-      });
-      safeSend(b.boardWs, { type: "pair_request" });
-      console.log(`Pair request pending: ${id}`);
-      break;
-    }
-
-    // ── Board approves pending companion ──
-    case "approve_pair": {
-      if (ws.role !== "board" || !ws.boardId) return;
-      const b = boards.get(ws.boardId);
-      if (!b || !b.pendingWs) return;
-      completePairing(b, b.pendingWs, ws.boardId);
-      b.pendingWs = null;
-      break;
-    }
-
-    // ── Board rejects pending companion ──
-    case "reject_pair": {
-      if (ws.role !== "board" || !ws.boardId) return;
-      const b = boards.get(ws.boardId);
-      if (!b || !b.pendingWs) return;
-      safeSend(b.pendingWs, {
-        type: "error",
-        message: "Connection rejected by TV",
-      });
-      b.pendingWs.boardId = null;
-      b.pendingWs = null;
-      safeSend(ws, { type: "pair_rejected" });
-      console.log(`Pair rejected: ${ws.boardId}`);
-      break;
-    }
-
-    // ── Companion disconnects cleanly ──
-    case "companion_disconnect": {
-      if (ws.role !== "companion" || !ws.boardId) return;
-      const b = boards.get(ws.boardId);
-      if (!b) return;
-      b.companionWs = null;
-      b.locked = false;
-      // Generate new code+secret for next pairing
-      boards.delete(ws.boardId);
-      const newId = genBoardId();
-      const newSecret = genSecret();
-      boards.set(newId, {
-        ...b,
-        companionWs: null,
-        pendingWs: null,
-        secret: newSecret,
-        locked: false,
-        lastActive: Date.now(),
-      });
-      if (b.boardWs) {
-        b.boardWs.boardId = newId;
-      }
-      safeSend(b.boardWs, {
-        type: "companion_disconnected_new_code",
-        boardId: newId,
-        secret: newSecret,
-      });
-      ws.boardId = null;
-      ws.role = null;
-      safeSend(ws, { type: "disconnected" });
-      break;
-    }
-
-    // ── Board kicks companion ──
-    case "kick_companion": {
-      if (ws.role !== "board" || !ws.boardId) return;
-      const b = boards.get(ws.boardId);
-      if (!b) return;
-      if (b.companionWs) {
-        safeSend(b.companionWs, { type: "kicked" });
-        b.companionWs.boardId = null;
-        b.companionWs.role = null;
-        b.companionWs = null;
-      }
-      b.locked = false;
-      // New code+secret
-      boards.delete(ws.boardId);
-      const newId = genBoardId();
-      const newSecret = genSecret();
-      boards.set(newId, {
-        ...b,
-        companionWs: null,
-        pendingWs: null,
-        secret: newSecret,
-        locked: false,
-        lastActive: Date.now(),
-      });
-      ws.boardId = newId;
-      safeSend(ws, { type: "new_code", boardId: newId, secret: newSecret });
-      console.log(`Board kicked, new code: ${newId}`);
-      break;
-    }
-
-    // ── Board reconnects ──
-    case "reconnect_board": {
-      const id =
-        typeof msg.boardId === "string"
-          ? msg.boardId
-              .toUpperCase()
-              .replace(/[^A-Z0-9]/g, "")
-              .slice(0, 6)
-          : "";
-      const b = boards.get(id);
-      if (!b) {
-        safeSend(ws, { type: "error", message: "Board expired" });
-        return;
-      }
-      b.boardWs = ws;
-      b.lastActive = Date.now();
-      ws.boardId = id;
-      ws.role = "board";
-      safeSend(ws, {
-        type: "reconnected",
-        boardId: id,
-        secret: b.secret,
-        settings: b.settings,
-        messages: b.messages,
-        mode: b.mode,
-        weatherPoint: b.weatherPoint,
-        weatherStation: b.weatherStation,
-        locked: b.locked,
-      });
-      safeSend(b.companionWs, { type: "board_reconnected" });
-      console.log(`Board reconnected: ${id}`);
-      break;
-    }
-
-    // ── Forward companion → board commands ──
-    case "update_settings":
-    case "update_messages":
-    case "play_sequence":
-    case "next_message":
-    case "reset_board":
-    case "flip_message":
-    case "set_mode": {
-      if (ws.role !== "companion" || !ws.boardId) return;
-      const b = boards.get(ws.boardId);
-      if (!b) return;
-      b.lastActive = Date.now();
-      if (
-        msg.type === "update_settings" &&
-        msg.settings &&
-        typeof msg.settings === "object"
-      )
-        b.settings = msg.settings;
-      if (msg.type === "update_messages" && typeof msg.messages === "string")
-        b.messages = msg.messages.slice(0, 10000);
-      if (msg.type === "set_mode" && typeof msg.mode === "string") {
-        b.mode = msg.mode;
-        if (msg.weatherPoint && typeof msg.weatherPoint === "object") {
-          const point = normalizeWeatherPoint(
-            msg.weatherPoint.latitude,
-            msg.weatherPoint.longitude,
-          );
-          if (point) {
-            b.weatherPoint = point;
-            msg.weatherPoint = point;
-          } else {
-            delete msg.weatherPoint;
-          }
-        }
-        if (typeof msg.weatherStation === "string") {
-          b.weatherStation = normalizeWeatherStation(msg.weatherStation);
-        }
-        msg.weatherStation = b.weatherStation;
-      }
-      safeSend(b.boardWs, msg);
-      break;
-    }
-
-    case "board_state": {
-      if (ws.role !== "board" || !ws.boardId) return;
-      const b = boards.get(ws.boardId);
-      if (!b) return;
-      b.lastActive = Date.now();
-      safeSend(b.companionWs, msg);
-      break;
-    }
-  }
-}
-
-function completePairing(b, companionWs, boardId) {
-  // Replace existing companion if any
-  if (b.companionWs && b.companionWs !== companionWs) {
-    safeSend(b.companionWs, { type: "replaced" });
-    b.companionWs.boardId = null;
-    b.companionWs.role = null;
-  }
-  b.companionWs = companionWs;
-  b.locked = true;
-  b.lastActive = Date.now();
-  b.pendingWs = null;
-  companionWs.boardId = boardId;
-  companionWs.role = "companion";
-  safeSend(companionWs, {
-    type: "paired",
-    boardId,
-    settings: b.settings,
-    messages: b.messages,
-    mode: b.mode,
-    weatherPoint: b.weatherPoint,
-    weatherStation: b.weatherStation,
-  });
-  safeSend(b.boardWs, { type: "companion_joined" });
-  console.log(`Paired: ${boardId} (locked)`);
-}
 
 const hb = setInterval(() => {
   wss.clients.forEach((ws) => {
@@ -761,8 +302,10 @@ const hb = setInterval(() => {
 wss.on("close", () => clearInterval(hb));
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`\n  splitflap.org server on http://localhost:${PORT}\n`);
-  console.log(`  Board:     http://localhost:${PORT}/board.html`);
-  console.log(`  Companion: http://localhost:${PORT}/companion.html\n`);
+const HOST = process.env.HOST || "0.0.0.0";
+server.listen(PORT, HOST, () => {
+  console.log(`\n  Split-flap board server on http://${HOST}:${PORT}\n`);
+  console.log(`  Board:     /board.html`);
+  console.log(`  Moderator: /moderator.html`);
+  console.log(`  Submit:    /submit.html\n`);
 });

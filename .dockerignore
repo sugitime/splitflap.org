@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.gitattributes
+*.md
+image.png
+board.png
+favicon.png
+docker-compose.yml
+render.yaml
+Dockerfile
+.dockerignore

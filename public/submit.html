@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"
+    />
+    <title>Submit a Message</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #09090b;
+        --card: #111114;
+        --border: #1e1e24;
+        --text: #8a8a96;
+        --text2: #555560;
+        --white: #ededf0;
+        --accent: #d4d4dc;
+        --r: 12px;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        -webkit-tap-highlight-color: transparent;
+      }
+      body {
+        font-family: Inter, system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        padding: 16px;
+        padding-bottom: max(16px, env(safe-area-inset-bottom));
+      }
+      .wrap {
+        width: 100%;
+        max-width: 480px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 20px;
+        color: var(--white);
+        margin-bottom: 6px;
+      }
+      .intro {
+        color: var(--text);
+        font-size: 14px;
+        line-height: 1.5;
+        margin-bottom: 16px;
+      }
+
+      .mini-board {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--r);
+        padding: 12px;
+        margin-bottom: 12px;
+      }
+      .mini-board-label {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--text2);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .mini-board-label .info {
+        font-family: "Roboto Mono", monospace;
+        color: var(--accent);
+        text-transform: none;
+        letter-spacing: 0;
+        font-size: 10px;
+      }
+      .mini-grid {
+        display: grid;
+        gap: 1px;
+        background: #0a0a0c;
+        border-radius: 4px;
+        padding: 4px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .mini-cell {
+        aspect-ratio: 1/1.3;
+        border-radius: 2px;
+        background: #151518;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: "Roboto Mono", monospace;
+        font-size: 7px;
+        font-weight: 700;
+        color: #555;
+        min-width: 0;
+        overflow: hidden;
+      }
+      .mini-cell.has-char {
+        color: #999;
+      }
+      .row-counter {
+        display: flex;
+        gap: 4px;
+        margin-top: 8px;
+        flex-wrap: wrap;
+      }
+      .row-counter span {
+        font-size: 9px;
+        font-family: "Roboto Mono", monospace;
+        color: var(--text2);
+        background: var(--bg);
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+      .row-counter span.over {
+        color: #ef4444;
+        background: rgba(239, 68, 68, 0.1);
+      }
+
+      .editor-card {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px;
+        margin-bottom: 8px;
+      }
+      .editor-card-head {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--text2);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+      }
+      #message {
+        width: 100%;
+        min-height: 120px;
+        background: transparent;
+        border: none;
+        color: var(--white);
+        font-family: "Roboto Mono", monospace;
+        font-size: 13px;
+        line-height: 1.5;
+        resize: vertical;
+        outline: none;
+      }
+      #message::placeholder {
+        color: #444;
+      }
+
+      .color-label {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--text2);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin: 12px 0 8px;
+      }
+      .color-blocks {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .color-block {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        cursor: pointer;
+        border: 2px solid rgba(255, 255, 255, 0.08);
+        transition: transform 0.12s;
+      }
+      .color-block:active {
+        transform: scale(1.12);
+      }
+
+      .submit-btn {
+        width: 100%;
+        margin-top: 16px;
+        padding: 14px;
+        border: none;
+        border-radius: 10px;
+        background: #22c55e;
+        color: #041007;
+        font: inherit;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .submit-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .status {
+        margin-top: 14px;
+        font-size: 14px;
+        min-height: 20px;
+      }
+      .status.ok {
+        color: #22c55e;
+      }
+      .status.err {
+        color: #ef4444;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Submit a message</h1>
+      <p class="intro">
+        Type your message below. Use the color blocks for colored cells on the
+        board. A moderator will review it before it appears for 20 seconds.
+      </p>
+
+      <div class="mini-board">
+        <div class="mini-board-label">
+          <span>Board preview</span>
+          <span class="info" id="board-info">96×5</span>
+        </div>
+        <div class="mini-grid" id="mini-grid"></div>
+        <div class="row-counter" id="row-counter"></div>
+      </div>
+
+      <form id="submit-form">
+        <div class="editor-card">
+          <div class="editor-card-head">Your message</div>
+          <textarea
+            id="message"
+            rows="5"
+            maxlength="480"
+            placeholder="Type your message…"
+            required
+          ></textarea>
+        </div>
+
+        <div class="color-label">Color blocks</div>
+        <div class="color-blocks" id="color-insert-row"></div>
+
+        <button type="submit" class="submit-btn" id="submit-btn">
+          Submit for approval
+        </button>
+      </form>
+      <div class="status" id="status"></div>
+    </div>
+
+    <script>
+      const BOARD_COLS = 96;
+      const BOARD_ROWS = 5;
+
+      const COLOR_MAP = {
+        "🟥": "#e02424",
+        "🟧": "#f97316",
+        "🟨": "#eab308",
+        "🟩": "#16a34a",
+        "🟦": "#2563eb",
+        "🟪": "#9333ea",
+        "⬜": "#ffffff",
+      };
+
+      const form = document.getElementById("submit-form");
+      const messageEl = document.getElementById("message");
+      const statusEl = document.getElementById("status");
+      const submitBtn = document.getElementById("submit-btn");
+      const miniGrid = document.getElementById("mini-grid");
+      const rowCounter = document.getElementById("row-counter");
+
+      function escapeHtml(s) {
+        return s
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+
+      /** Split message into board rows, wrapping long lines at cols. */
+      function wrapMessageToRows(msg, cols) {
+        const result = [];
+        for (const line of msg.split("\n")) {
+          const chars = Array.from(line);
+          if (chars.length === 0) {
+            result.push("");
+            continue;
+          }
+          for (let i = 0; i < chars.length; i += cols) {
+            result.push(chars.slice(i, i + cols).join(""));
+          }
+        }
+        return result;
+      }
+
+      function updateMiniBoard() {
+        const msg = messageEl.value;
+        const wrappedRows = wrapMessageToRows(msg, BOARD_COLS);
+        const overCapacity = wrappedRows.length > BOARD_ROWS;
+        const boardInfo = document.getElementById("board-info");
+        boardInfo.textContent = overCapacity
+          ? `${wrappedRows.length}/${BOARD_ROWS} rows`
+          : "96×5";
+        boardInfo.style.color = overCapacity ? "#ef4444" : "";
+
+        miniGrid.style.gridTemplateColumns = `repeat(${BOARD_COLS}, 1fr)`;
+
+        let html = "";
+        const rc = [];
+        for (let r = 0; r < BOARD_ROWS; r++) {
+          const lineChars = Array.from(wrappedRows[r] || "");
+          let used = 0;
+          for (let c = 0; c < BOARD_COLS; c++) {
+            const ch = lineChars[c] || " ";
+            const isColor = !!COLOR_MAP[ch];
+            const filled = ch !== " ";
+            if (filled) used++;
+            if (isColor) {
+              html += `<div class="mini-cell is-color" style="background:${COLOR_MAP[ch]}"></div>`;
+            } else if (filled) {
+              html += `<div class="mini-cell has-char">${escapeHtml(ch)}</div>`;
+            } else {
+              html += `<div class="mini-cell"></div>`;
+            }
+          }
+          rc.push({ used, total: BOARD_COLS });
+        }
+        miniGrid.innerHTML = html;
+        rowCounter.innerHTML = rc
+          .map(
+            (row, i) =>
+              `<span>R${i + 1}: ${row.used}/${row.total}</span>`,
+          )
+          .join("");
+      }
+
+      function renderColorBlocks() {
+        const row = document.getElementById("color-insert-row");
+        row.innerHTML = "";
+        Object.entries(COLOR_MAP).forEach(([emoji, hex]) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "color-block";
+          btn.style.backgroundColor = hex;
+          btn.title = `Insert ${emoji}`;
+          btn.setAttribute("aria-label", `Insert color block ${emoji}`);
+          btn.addEventListener("click", () => {
+            const ta = messageEl;
+            const start = ta.selectionStart;
+            const end = ta.selectionEnd;
+            ta.value =
+              ta.value.substring(0, start) + emoji + ta.value.substring(end);
+            ta.selectionStart = ta.selectionEnd = start + emoji.length;
+            ta.focus();
+            updateMiniBoard();
+          });
+          row.appendChild(btn);
+        });
+      }
+
+      messageEl.addEventListener("input", updateMiniBoard);
+      messageEl.addEventListener("focus", updateMiniBoard);
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const text = messageEl.value.trim();
+        if (!text) return;
+
+        const wrappedRows = wrapMessageToRows(text, BOARD_COLS);
+        if (wrappedRows.length > BOARD_ROWS) {
+          statusEl.className = "status err";
+          statusEl.textContent =
+            "Message exceeds the board (5 rows). Shorten your message.";
+          return;
+        }
+
+        submitBtn.disabled = true;
+        statusEl.className = "status";
+        statusEl.textContent = "Submitting...";
+        try {
+          const res = await fetch("/api/submit-message", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) throw new Error(data.error || "Submit failed");
+          messageEl.value = "";
+          updateMiniBoard();
+          statusEl.className = "status ok";
+          statusEl.textContent =
+            "Submitted! A moderator will review it shortly.";
+        } catch (err) {
+          statusEl.className = "status err";
+          statusEl.textContent = err.message || "Could not submit message.";
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+
+      renderColorBlocks();
+      updateMiniBoard();
+    </script>
+  </body>
+</html>

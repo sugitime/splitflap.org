@@ -1,0 +1,14 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# Deploy: connect this repo in the Render dashboard and apply the blueprint,
+# or use "New > Blueprint" and point at this file.
+
+services:
+  - type: web
+    name: splitflap
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
