@@ -28,6 +28,7 @@ app.use(express.static(path.join(__dirname, "public")));
 const SESSION_TTL = 12 * 60 * 60 * 1000;
 const PUBLIC_MSG_MAX = 500;
 const PUBLIC_DISPLAY_MS = 20000;
+const HISTORY_MAX = 200;
 
 const AUTH = {
   moderator: {
@@ -41,6 +42,38 @@ let boardWs = null;
 let moderatorWs = null;
 const submissionQueue = [];
 const displayQueue = [];
+const messageHistory = [];
+
+function historySnapshot(limit = 50) {
+  return messageHistory.slice(0, limit).map((h) => ({ ...h }));
+}
+
+function addHistory(entry) {
+  messageHistory.unshift(entry);
+  if (messageHistory.length > HISTORY_MAX) messageHistory.length = HISTORY_MAX;
+}
+
+function updateHistoryByMessageId(messageId, patch) {
+  const idx = messageHistory.findIndex((h) => h.messageId === messageId);
+  if (idx === -1) return;
+  messageHistory[idx] = { ...messageHistory[idx], ...patch };
+}
+
+function recordQueuedMessage(entry, source) {
+  addHistory({
+    id: genMessageId(),
+    messageId: entry.id,
+    text: entry.text,
+    source,
+    action: "queued",
+    autocenter: !!entry.autocenter,
+    durationMs: entry.indefinite ? 0 : (entry.durationMs ?? PUBLIC_DISPLAY_MS),
+    indefinite: !!entry.indefinite,
+    at: Date.now(),
+    endedAt: null,
+    endAction: null,
+  });
+}
 
 function genToken() {
   return crypto.randomBytes(32).toString("hex");
@@ -104,6 +137,7 @@ function queueSnapshot() {
     nowPlaying,
     boardOnline: !!(boardWs && boardWs.readyState === 1),
     moderatorOnline: !!(moderatorWs && moderatorWs.readyState === 1),
+    history: historySnapshot(),
   };
 }
 
@@ -157,6 +191,10 @@ function onPublicMessageDone(id) {
     const idx = displayQueue.findIndex((m) => m.id === id);
     if (idx !== -1) displayQueue.splice(idx, 1);
   }
+  updateHistoryByMessageId(id, {
+    endAction: "completed",
+    endedAt: Date.now(),
+  });
   playNextOnBoard();
   notifyModerator();
 }
@@ -221,6 +259,14 @@ app.get("/api/moderator/queue", authMiddleware, (_, res) => {
   res.json({ ok: true, ...queueSnapshot() });
 });
 
+app.get("/api/moderator/history", authMiddleware, (req, res) => {
+  const limit = Math.min(
+    Math.max(Number.parseInt(req.query.limit, 10) || 50, 1),
+    HISTORY_MAX,
+  );
+  res.json({ ok: true, history: historySnapshot(limit) });
+});
+
 app.post("/api/moderator/approve/:id", authMiddleware, (req, res) => {
   const idx = submissionQueue.findIndex((m) => m.id === req.params.id);
   if (idx === -1) {
@@ -231,6 +277,7 @@ app.post("/api/moderator/approve/:id", authMiddleware, (req, res) => {
   entry.approvedAt = Date.now();
   entry.durationMs = PUBLIC_DISPLAY_MS;
   entry.indefinite = false;
+  recordQueuedMessage(entry, "public");
   enqueueDisplay(entry);
   res.json({ ok: true, message: entry });
 });
@@ -241,7 +288,17 @@ app.post("/api/moderator/reject/:id", authMiddleware, (req, res) => {
     res.status(404).json({ ok: false, error: "Message not found" });
     return;
   }
-  submissionQueue.splice(idx, 1);
+  const entry = submissionQueue.splice(idx, 1)[0];
+  addHistory({
+    id: genMessageId(),
+    messageId: entry.id,
+    text: entry.text,
+    source: "public",
+    action: "rejected",
+    autocenter: !!entry.autocenter,
+    at: Date.now(),
+    submittedAt: entry.submittedAt,
+  });
   notifyModerator();
   res.json({ ok: true });
 });
@@ -265,6 +322,7 @@ app.post("/api/moderator/post", authMiddleware, (req, res) => {
     source: "moderator",
     ...timing,
   };
+  recordQueuedMessage(entry, "moderator");
   displayQueue.unshift(entry);
   boardPlayEntry(entry);
   notifyModerator();
@@ -277,6 +335,12 @@ app.post("/api/moderator/clear", authMiddleware, (req, res) => {
     return;
   }
   const removed = displayQueue.length ? displayQueue.shift() : null;
+  if (removed) {
+    updateHistoryByMessageId(removed.id, {
+      endAction: "cleared",
+      endedAt: Date.now(),
+    });
+  }
   clearBoardDisplay(removed?.id);
   playNextOnBoard();
   notifyModerator();
