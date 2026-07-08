@@ -814,23 +814,29 @@
         CANVAS_H = 1200,
         LEFT_PANEL_W = 1200,
         BOARD_AREA_W = CANVAS_W - LEFT_PANEL_W;
+      function computeBoardScale() {
+        const pad = S.boardPad * 2;
+        const gapW = (S.cols - 1) * S.gridGap;
+        const gapH = (S.rows - 1) * S.gridGap;
+        const scaleW = (BOARD_AREA_W - pad - gapW) / (S.cols * S.width);
+        const scaleH = (CANVAS_H - pad - gapH) / (S.rows * S.height);
+        return Math.min(scaleW, scaleH);
+      }
       function applyAutoFit() {
         if (!S.autoFit) return;
-        const grid = boardWrapper.querySelector(".vestaboard-grid");
-        if (!grid) return;
+        const nextScale = computeBoardScale();
         boardWrapper.style.transform = "none";
         boardWrapper.style.width = "";
         boardWrapper.style.height = "";
-        requestAnimationFrame(() => {
-          const bw = grid.offsetWidth,
-            bh = grid.offsetHeight;
-          if (!bw || !bh) return;
-          const areaW = boardArea.clientWidth || BOARD_AREA_W;
-          const fr = Math.min(areaW / bw, CANVAS_H / bh);
-          boardWrapper.style.width = bw + "px";
-          boardWrapper.style.height = bh + "px";
-          boardWrapper.style.transform = `scale(${fr})`;
-        });
+        const grid = boardWrapper.querySelector(".vestaboard-grid");
+        if (grid) {
+          grid.style.transform = "none";
+          grid.style.transformOrigin = "";
+        }
+        if (Math.abs(nextScale - S.scale) > 0.0001) {
+          S.scale = nextScale;
+          dynamicCSS.textContent = buildDynamicCSS();
+        }
       }
       function fitViewport() {
         const scale = Math.min(
@@ -995,6 +1001,7 @@
       });
       document.addEventListener("click", () => getAudioCtx(), { once: true });
 
+      if (S.autoFit) S.scale = computeBoardScale();
       renderBoard();
       lastStructKey = `${S.cols}|${S.rows}|${S.ridgeCount}`;
       boardArea.style.backgroundColor = S.previewBg;
