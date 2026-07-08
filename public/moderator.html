@@ -138,6 +138,23 @@
         color: #ef4444;
         border: 1px solid rgba(239, 68, 68, 0.35);
       }
+      .btn-remove {
+        background: transparent;
+        color: #f59e0b;
+        border: 1px solid rgba(245, 158, 11, 0.35);
+      }
+      .queue-item.playing {
+        border-color: rgba(34, 197, 94, 0.25);
+        background: rgba(34, 197, 94, 0.04);
+      }
+      .queue-playing-badge {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #22c55e;
+        margin-left: 8px;
+      }
       .toolbar {
         display: flex;
         justify-content: space-between;
@@ -195,6 +212,7 @@
       .history-badge.queued { background: rgba(59, 130, 246, 0.12); color: #60a5fa; }
       .history-badge.completed { background: rgba(34, 197, 94, 0.12); color: #22c55e; }
       .history-badge.cleared { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
+      .history-badge.removed { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
       .history-badge.public { background: #151518; color: #a1a1aa; }
       .history-badge.moderator { background: #151518; color: #a1a1aa; }
       .history-text {
@@ -411,6 +429,9 @@
           <div class="now-playing-meta" id="now-playing-meta"></div>
         </div>
 
+        <div class="section-title">Display queue</div>
+        <div id="display-queue-list"></div>
+
         <div class="section-title">Pending approval</div>
         <div id="queue-list"></div>
 
@@ -439,8 +460,19 @@
       const loginScreen = document.getElementById("login-screen");
       const queueScreen = document.getElementById("queue-screen");
       const queueList = document.getElementById("queue-list");
+      const displayQueueList = document.getElementById("display-queue-list");
       const historyList = document.getElementById("history-list");
       const loginError = document.getElementById("login-error");
+      let localQueue = {
+        pending: [],
+        displayItems: [],
+        display: 0,
+        nowPlaying: null,
+        history: [],
+        boardOnline: false,
+        moderatorOnline: false,
+        moderatorCount: 0,
+      };
 
       function getToken() {
         return sessionStorage.getItem(TOKEN_KEY) || "";
@@ -653,9 +685,124 @@
           )
           .join("");
       }
+      function renderDisplayQueue(items) {
+        if (!items?.length) {
+          displayQueueList.innerHTML =
+            '<div class="empty">No messages in the display queue.</div>';
+          return;
+        }
+        displayQueueList.innerHTML = items
+          .map((item) => {
+            const source =
+              item.source === "moderator" ? "Moderator" : "Public";
+            const timing = item.indefinite
+              ? "Indefinite"
+              : `${Math.round((item.durationMs || 20000) / 1000)}s`;
+            return `
+          <div class="queue-item${item.playing ? " playing" : ""}">
+            <div class="queue-meta">
+              #${item.position} · ${escapeHtml(source)} · ${escapeHtml(timing)}
+              ${item.playing ? '<span class="queue-playing-badge">On board</span>' : ""}
+            </div>
+            <div class="queue-text">${escapeHtml(item.text)}</div>
+            <div class="queue-actions">
+              <button class="btn-remove" data-remove="${item.id}">Remove</button>
+            </div>
+          </div>`;
+          })
+          .join("");
+      }
+      function applyQueueState(data) {
+        localQueue = { ...localQueue, ...data };
+        updateStatus(localQueue);
+        renderQueue(localQueue.pending || []);
+        renderDisplayQueue(localQueue.displayItems || []);
+      }
+      function optimisticPost(text, indefinite, durationMs) {
+        const tempId = `opt-${Date.now()}`;
+        const bumped = (localQueue.displayItems || []).map((item, i) => ({
+          ...item,
+          playing: false,
+          position: i + 2,
+        }));
+        const newItem = {
+          id: tempId,
+          text,
+          position: 1,
+          playing: true,
+          indefinite,
+          durationMs,
+          source: "moderator",
+        };
+        localQueue.displayItems = [newItem, ...bumped];
+        localQueue.nowPlaying = {
+          id: tempId,
+          text,
+          indefinite,
+          durationMs,
+        };
+        localQueue.display = localQueue.displayItems.length;
+        applyQueueState(localQueue);
+      }
+      function optimisticClear() {
+        const items = [...(localQueue.displayItems || [])];
+        if (!items.length) return;
+        items.shift();
+        items.forEach((item, i) => {
+          item.position = i + 1;
+          item.playing = i === 0;
+        });
+        localQueue.displayItems = items;
+        localQueue.display = items.length;
+        localQueue.nowPlaying = items[0]
+          ? {
+              id: items[0].id,
+              text: items[0].text,
+              indefinite: items[0].indefinite,
+              durationMs: items[0].durationMs,
+            }
+          : null;
+        applyQueueState(localQueue);
+      }
+      function optimisticRemoveDisplay(id) {
+        const items = (localQueue.displayItems || []).filter(
+          (item) => item.id !== id,
+        );
+        items.forEach((item, i) => {
+          item.position = i + 1;
+          item.playing = i === 0;
+        });
+        localQueue.displayItems = items;
+        localQueue.display = items.length;
+        localQueue.nowPlaying = items[0]
+          ? {
+              id: items[0].id,
+              text: items[0].text,
+              indefinite: items[0].indefinite,
+              durationMs: items[0].durationMs,
+            }
+          : null;
+        applyQueueState(localQueue);
+      }
+      function optimisticApprove(id) {
+        localQueue.pending = (localQueue.pending || []).filter(
+          (item) => item.id !== id,
+        );
+        applyQueueState(localQueue);
+      }
+      function optimisticReject(id) {
+        localQueue.pending = (localQueue.pending || []).filter(
+          (item) => item.id !== id,
+        );
+        applyQueueState(localQueue);
+      }
+      function syncQueueFallback() {
+        if (ws?.readyState !== 1) refreshQueue();
+      }
       function historyStatusLabel(item) {
         if (item.action === "rejected") return "Rejected";
         if (item.endAction === "cleared") return "Cleared";
+        if (item.endAction === "removed") return "Removed";
         if (item.endAction === "completed") return "Displayed";
         if (
           item.messageId === currentNowPlayingId &&
@@ -669,6 +816,7 @@
       function historyStatusClass(item) {
         if (item.action === "rejected") return "rejected";
         if (item.endAction === "cleared") return "cleared";
+        if (item.endAction === "removed") return "removed";
         if (item.endAction === "completed") return "completed";
         if (
           item.messageId === currentNowPlayingId &&
@@ -734,8 +882,7 @@
         return { res, data };
       }
       function handleQueueUpdate(data) {
-        updateStatus(data);
-        renderQueue(data.pending || []);
+        applyQueueState(data);
       }
       function connectWs() {
         const token = getToken();
@@ -758,7 +905,13 @@
           }
         };
         ws.onclose = () => {
-          updateStatus({ boardOnline: false, moderatorOnline: false, display: 0, pending: [] });
+          applyQueueState({
+            boardOnline: false,
+            moderatorOnline: false,
+            display: 0,
+            pending: localQueue.pending,
+            displayItems: localQueue.displayItems,
+          });
           if (getToken()) {
             clearTimeout(reconnectTimer);
             reconnectTimer = setTimeout(connectWs, 3000);
@@ -822,7 +975,7 @@
         }
       }
 
-      document.getElementById("post-btn").addEventListener("click", async () => {
+      document.getElementById("post-btn").addEventListener("click", () => {
         postError.textContent = "";
         const text = modMessage.value.trim();
         if (!text) {
@@ -835,50 +988,82 @@
             "Message exceeds the board (5 rows). Shorten your message.";
           return;
         }
-        try {
-          const body = {
-            text,
-            indefinite: modIndefinite.checked,
-            autocenter: document.getElementById("mod-autocenter").checked,
-          };
-          if (!modIndefinite.checked) {
-            body.durationSeconds = Number.parseInt(modDuration.value, 10) || 20;
-          }
-          await api("/api/moderator/post", {
-            method: "POST",
-            body: JSON.stringify(body),
-          });
-          modMessage.value = "";
-          updateMiniBoard();
-          await refreshQueue();
-        } catch (err) {
-          postError.textContent = err.message || "Could not post message";
+        const indefinite = modIndefinite.checked;
+        const durationMs = indefinite
+          ? 0
+          : (Number.parseInt(modDuration.value, 10) || 20) * 1000;
+        const body = {
+          text,
+          indefinite,
+          autocenter: document.getElementById("mod-autocenter").checked,
+        };
+        if (!indefinite) {
+          body.durationSeconds = Number.parseInt(modDuration.value, 10) || 20;
         }
+        modMessage.value = "";
+        updateMiniBoard();
+        optimisticPost(text, indefinite, durationMs);
+        api("/api/moderator/post", {
+          method: "POST",
+          body: JSON.stringify(body),
+        })
+          .then(({ res, data }) => {
+            if (!res.ok) throw new Error(data.error || "Could not post message");
+            syncQueueFallback();
+          })
+          .catch((err) => {
+            postError.textContent = err.message || "Could not post message";
+            syncQueueFallback();
+          });
       });
 
-      document.getElementById("clear-btn").addEventListener("click", async () => {
+      document.getElementById("clear-btn").addEventListener("click", () => {
         postError.textContent = "";
         if (!confirm("Remove the current message from the board immediately?")) return;
-        try {
-          await api("/api/moderator/clear", { method: "POST" });
-          await refreshQueue();
-        } catch (err) {
-          postError.textContent = err.message || "Could not clear message";
-        }
+        optimisticClear();
+        api("/api/moderator/clear", { method: "POST" })
+          .then(({ res, data }) => {
+            if (!res.ok) throw new Error(data.error || "Could not clear message");
+            syncQueueFallback();
+          })
+          .catch((err) => {
+            postError.textContent = err.message || "Could not clear message";
+            syncQueueFallback();
+          });
       });
-      queueList.addEventListener("click", async (e) => {
+      queueList.addEventListener("click", (e) => {
         const approveId = e.target.getAttribute("data-approve");
         const rejectId = e.target.getAttribute("data-reject");
-        try {
-          if (approveId) {
-            await api(`/api/moderator/approve/${approveId}`, { method: "POST" });
-          } else if (rejectId) {
-            await api(`/api/moderator/reject/${rejectId}`, { method: "POST" });
-          } else return;
-          await refreshQueue();
-        } catch (err) {
-          alert(err.message || "Action failed");
-        }
+        if (!approveId && !rejectId) return;
+        if (approveId) optimisticApprove(approveId);
+        else optimisticReject(rejectId);
+        const path = approveId
+          ? `/api/moderator/approve/${approveId}`
+          : `/api/moderator/reject/${rejectId}`;
+        api(path, { method: "POST" })
+          .then(({ res, data }) => {
+            if (!res.ok) throw new Error(data.error || "Action failed");
+            syncQueueFallback();
+          })
+          .catch((err) => {
+            alert(err.message || "Action failed");
+            syncQueueFallback();
+          });
+      });
+      displayQueueList.addEventListener("click", (e) => {
+        const removeId = e.target.getAttribute("data-remove");
+        if (!removeId) return;
+        if (!confirm("Remove this message from the display queue?")) return;
+        optimisticRemoveDisplay(removeId);
+        api(`/api/moderator/queue/${removeId}`, { method: "DELETE" })
+          .then(({ res, data }) => {
+            if (!res.ok) throw new Error(data.error || "Could not remove message");
+            syncQueueFallback();
+          })
+          .catch((err) => {
+            alert(err.message || "Could not remove message");
+            syncQueueFallback();
+          });
       });
       if (getToken()) {
         showQueue();

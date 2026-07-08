@@ -134,6 +134,15 @@ function queueSnapshot() {
       submittedAt: m.submittedAt,
     })),
     display: displayQueue.length,
+    displayItems: displayQueue.map((m, i) => ({
+      id: m.id,
+      text: m.text,
+      position: i + 1,
+      playing: i === 0,
+      indefinite: !!m.indefinite,
+      durationMs: m.durationMs ?? PUBLIC_DISPLAY_MS,
+      source: m.source || "public",
+    })),
     nowPlaying,
     boardOnline: !!(boardWs && boardWs.readyState === 1),
     moderatorOnline: moderatorWsSet.size > 0,
@@ -165,6 +174,14 @@ function boardPlayEntry(entry, urgent = false) {
 function playNextOnBoard() {
   if (!displayQueue.length) return;
   boardPlayEntry(displayQueue[0]);
+}
+
+function advanceBoardAfterPlayingRemoved(removed) {
+  if (displayQueue.length) {
+    boardPlayEntry(displayQueue[0], true);
+  } else {
+    clearBoardDisplay(removed?.id, true);
+  }
 }
 
 function clearBoardDisplay(id, urgent = false) {
@@ -350,13 +367,28 @@ app.post("/api/moderator/clear", authMiddleware, (req, res) => {
       endedAt: Date.now(),
     });
   }
-  if (displayQueue.length) {
-    boardPlayEntry(displayQueue[0], true);
-  } else {
-    clearBoardDisplay(removed?.id, true);
-  }
+  advanceBoardAfterPlayingRemoved(removed);
   notifyModerator();
   res.json({ ok: true, cleared: !!removed, id: removed?.id || null });
+});
+
+app.delete("/api/moderator/queue/:id", authMiddleware, (req, res) => {
+  const idx = displayQueue.findIndex((m) => m.id === req.params.id);
+  if (idx === -1) {
+    res.status(404).json({ ok: false, error: "Queue item not found" });
+    return;
+  }
+  const removed = displayQueue.splice(idx, 1)[0];
+  const wasPlaying = idx === 0;
+  updateHistoryByMessageId(removed.id, {
+    endAction: "removed",
+    endedAt: Date.now(),
+  });
+  if (wasPlaying) {
+    advanceBoardAfterPlayingRemoved(removed);
+  }
+  notifyModerator();
+  res.json({ ok: true, id: removed.id, wasPlaying });
 });
 
 wss.on("connection", (ws) => {

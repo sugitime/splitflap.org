@@ -232,15 +232,12 @@
       }
 
       const S = {
-        animDuration: 140,
+        animDuration: 360,
         animPerspective: 3000,
-        animStagger: 8,
+        animStagger: 40,
         animEasing: "ease-in-out",
         msgDelay: 20000,
-        fastSpeed: 8,
-        urgentAnimDuration: 70,
-        urgentFastSpeed: 4,
-        urgentAnimStagger: 0,
+        fastSpeed: 25,
         loopSequence: true,
         soundVolume: 0.8,
         soundRate: 1.5,
@@ -513,8 +510,7 @@
         animRAF = null,
         animT0 = 0,
         animTarget = null,
-        animDoneCb = null,
-        flipUrgent = false;
+        animDoneCb = null;
       function charDisplay(ch) {
         const isC = !!COLOR_MAP[ch];
         return {
@@ -559,7 +555,6 @@
           animRAF = null;
           currentChars = [...animTarget];
           isFlipping = false;
-          flipUrgent = false;
           if (animDoneCb) animDoneCb();
         }
       }
@@ -581,10 +576,8 @@
           animTarget = null;
         }
         isFlipping = false;
-        flipUrgent = false;
       }
       function getDelay(idx) {
-        if (flipUrgent) return 0;
         return (
           (idx % S.cols) * S.animStagger +
           Math.floor(idx / S.cols) * S.animStagger * 1.5
@@ -602,15 +595,11 @@
         if (steps < 0) steps += SPOOL.length;
         if (steps === 0 && oldChar !== newChar) steps = 1;
 
-        let path = [];
-        if (flipUrgent && steps > 0) {
-          path = [newChar || " "];
-        } else {
-          for (let i = 1; i <= steps; i++)
-            path.push(SPOOL[(oi + i) % SPOOL.length]);
-          if (!path.length || path[path.length - 1] !== (newChar || " "))
-            path.push(newChar || " ");
-        }
+        const path = [];
+        for (let i = 1; i <= steps; i++)
+          path.push(SPOOL[(oi + i) % SPOOL.length]);
+        if (!path.length || path[path.length - 1] !== (newChar || " "))
+          path.push(newChar || " ");
 
         let t = delay;
         // Reference the correct state object name:
@@ -619,8 +608,8 @@
         // Adjust the variable name to match your file, or use a
         // local alias like: const _S = (typeof S !== 'undefined') ? S : state;
         const _S = typeof S !== "undefined" ? S : state;
-        const FAST = flipUrgent ? _S.urgentFastSpeed : _S.fastSpeed;
-        const FINAL = flipUrgent ? _S.urgentAnimDuration : _S.animDuration;
+        const FAST = _S.fastSpeed;
+        const FINAL = _S.animDuration;
 
         path.forEach((char, i) => {
           const isLast = i === path.length - 1;
@@ -721,9 +710,8 @@
 
         return t;
       }
-      function flipToTarget(target, onDone, urgent) {
+      function flipToTarget(target, onDone) {
         cancelAnimLoop();
-        flipUrgent = !!urgent;
         isFlipping = true;
         const total = S.cols * S.rows;
         if (currentChars.length !== total) currentChars = blankGrid();
@@ -732,7 +720,6 @@
           if (currentChars[i] !== target[i]) changed.push(i);
         if (!changed.length) {
           isFlipping = false;
-          flipUrgent = false;
           currentChars = [...target];
           syncCellsToChars(currentChars);
           if (onDone) onDone();
@@ -999,7 +986,7 @@
         publicQueuePlaying = false;
         currentPublicMessageId = null;
         clearPublicQueueTimer();
-        flipToTarget(blankGrid(), () => {}, urgent);
+        flipToTarget(blankGrid(), () => {});
       }
 
       function playPublicMessage(
@@ -1008,7 +995,6 @@
         id,
         indefinite,
         autocenter,
-        urgent,
       ) {
         clearPublicQueueTimer();
         publicQueuePlaying = true;
@@ -1018,15 +1004,11 @@
           : durationMs > 0
             ? durationMs
             : publicDisplayMs;
-        flipToTarget(
-          messageToGrid(text, autocenter),
-          () => {
-            if (!indefinite && ms > 0) {
-              publicQueueTimer = setTimeout(() => finishPublicMessage(id), ms);
-            }
-          },
-          urgent,
-        );
+        flipToTarget(messageToGrid(text, autocenter), () => {
+          if (!indefinite && ms > 0) {
+            publicQueueTimer = setTimeout(() => finishPublicMessage(id), ms);
+          }
+        });
       }
 
       let ws = null,
@@ -1056,7 +1038,6 @@
               msg.id,
               !!msg.indefinite,
               !!msg.autocenter,
-              !!msg.urgent,
             );
           }
           if (msg.type === "clear_public_message") {
