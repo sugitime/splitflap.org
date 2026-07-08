@@ -73,10 +73,22 @@
         border-right: 1px solid rgba(255, 255, 255, 0.08);
         pointer-events: none;
       }
-      #submit-qr-panel .submit-qr-label {
+      .panel-slot {
+        flex: 1 1 50%;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 28px 32px;
+      }
+      .panel-slot-qr {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .panel-slot .submit-qr-label {
         flex: 0 0 auto;
-        padding: 20px 24px 12px;
-        font-size: 22px;
+        margin-bottom: 12px;
+        font-size: 20px;
         color: rgba(255, 255, 255, 0.55);
         letter-spacing: 2px;
         text-transform: uppercase;
@@ -86,15 +98,15 @@
       #submit-qr-container {
         flex: 1 1 auto;
         min-height: 0;
+        width: 100%;
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 16px 24px 24px;
       }
       #submit-qr-container .submit-qr-frame {
         background: #fff;
-        padding: 16px;
-        border-radius: 16px;
+        padding: 14px;
+        border-radius: 14px;
         box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
         display: flex;
         align-items: center;
@@ -102,6 +114,14 @@
       }
       #submit-qr-container canvas {
         display: block;
+      }
+      .panel-slot-logo img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
       }
 
       /* Board */
@@ -173,8 +193,13 @@
     </div>
 
     <div id="submit-qr-panel">
-      <div class="submit-qr-label">Submit a message</div>
-      <div id="submit-qr-container"></div>
+      <div class="panel-slot panel-slot-qr">
+        <div class="submit-qr-label">Submit a message</div>
+        <div id="submit-qr-container"></div>
+      </div>
+      <div class="panel-slot panel-slot-logo">
+        <img src="dc-34-logo.avif" alt="DEF CON 34" />
+      </div>
     </div>
 
     <script>
@@ -799,13 +824,14 @@
       function generateSubmitQR() {
         const container = document.getElementById("submit-qr-container");
         const url = `${location.origin}/submit.html`;
-        const panel = document.getElementById("submit-qr-panel");
-        const pad = 80;
+        const slot = document.querySelector(".panel-slot-qr");
+        const pad = 64;
+        const labelH = 36;
         const size = Math.max(
-          320,
+          280,
           Math.min(
-            panel.clientWidth - pad,
-            panel.clientHeight - pad - 60,
+            slot.clientWidth - pad,
+            slot.clientHeight - pad - labelH,
           ),
         );
         drawQR(container, url, size, true);
