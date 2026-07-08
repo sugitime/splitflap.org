@@ -51,9 +51,8 @@
       }
       html,
       body {
-        width: 6912px;
-        height: 1200px;
-        max-height: 1200px;
+        width: var(--canvas-w, 6912px);
+        height: var(--canvas-h, 1200px);
         margin: 0;
         padding: 0;
         overflow: hidden;
@@ -64,18 +63,16 @@
       #stage {
         display: flex;
         flex-direction: row;
-        width: 6912px;
-        height: 1200px;
-        max-height: 1200px;
+        width: var(--canvas-w, 6912px);
+        height: var(--canvas-h, 1200px);
         overflow: hidden;
       }
 
       #submit-qr-panel {
         position: relative;
-        flex: 0 0 1200px;
-        width: 1200px;
-        height: 1200px;
-        max-height: 1200px;
+        flex: 0 0 var(--left-panel-w, 1200px);
+        width: var(--left-panel-w, 1200px);
+        height: var(--canvas-h, 1200px);
         background: #000;
         border-right: 1px solid rgba(255, 255, 255, 0.08);
         pointer-events: none;
@@ -89,7 +86,8 @@
         display: block;
         width: auto;
         max-width: 100%;
-        height: var(--board-grid-h, 592px);
+        height: var(--board-grid-h, 1200px);
+        max-height: var(--board-grid-h, 1200px);
         object-fit: contain;
         object-position: center top;
         flex: 0 0 auto;
@@ -138,10 +136,9 @@
       /* Board */
       .board-area {
         position: relative;
-        flex: 0 0 5712px;
-        width: 5712px;
-        height: 1200px;
-        max-height: 1200px;
+        flex: 0 0 var(--board-area-w, 5712px);
+        width: var(--board-area-w, 5712px);
+        height: var(--canvas-h, 1200px);
         padding: 0;
         display: flex;
         justify-content: flex-start;
@@ -816,28 +813,41 @@
           if (S.autoFit) requestAnimationFrame(applyAutoFit);
         }
       }
-      const CANVAS_W = 6912,
-        CANVAS_H = 1200,
-        LEFT_PANEL_W = 1200,
-        BOARD_AREA_W = CANVAS_W - LEFT_PANEL_W;
+      const CANVAS_H = 1200,
+        LEFT_PANEL_W = 1200;
+      let canvasW = 6912;
       function computeBoardScale() {
         const pad = S.boardPad * 2;
-        const gapW = (S.cols - 1) * S.gridGap;
         const gapH = (S.rows - 1) * S.gridGap;
-        const scaleW = (BOARD_AREA_W - pad - gapW) / (S.cols * S.width);
-        const scaleH = (CANVAS_H - pad - gapH) / (S.rows * S.height);
-        return Math.min(scaleW, scaleH);
+        return (CANVAS_H - pad - gapH) / (S.rows * S.height);
       }
       function computeBoardGridHeight() {
         const pad = S.boardPad * 2;
         const gapH = (S.rows - 1) * S.gridGap;
         return pad + S.rows * S.height * S.scale + gapH;
       }
-      function syncPanelLogoHeight() {
-        document.documentElement.style.setProperty(
-          "--board-grid-h",
-          computeBoardGridHeight() + "px",
-        );
+      function computeBoardGridWidth() {
+        const pad = S.boardPad * 2;
+        const gapW = (S.cols - 1) * S.gridGap;
+        return pad + S.cols * S.width * S.scale + gapW;
+      }
+      function syncCanvasLayout() {
+        const boardH = Math.ceil(computeBoardGridHeight());
+        const boardW = Math.ceil(computeBoardGridWidth());
+        canvasW = LEFT_PANEL_W + boardW;
+        const root = document.documentElement;
+        root.style.setProperty("--canvas-h", CANVAS_H + "px");
+        root.style.setProperty("--canvas-w", canvasW + "px");
+        root.style.setProperty("--left-panel-w", LEFT_PANEL_W + "px");
+        root.style.setProperty("--board-area-w", boardW + "px");
+        root.style.setProperty("--board-grid-h", boardH + "px");
+        const viewport = document.querySelector('meta[name="viewport"]');
+        if (viewport) {
+          viewport.setAttribute(
+            "content",
+            `width=${canvasW},height=${CANVAS_H},initial-scale=1.0,maximum-scale=1.0,user-scalable=no`,
+          );
+        }
       }
       function applyAutoFit() {
         if (!S.autoFit) return;
@@ -854,22 +864,23 @@
           S.scale = nextScale;
           dynamicCSS.textContent = buildDynamicCSS();
         }
-        syncPanelLogoHeight();
+        syncCanvasLayout();
+        requestAnimationFrame(fitViewport);
       }
       function fitViewport() {
         const scale = Math.min(
-          window.innerWidth / CANVAS_W,
+          window.innerWidth / canvasW,
           window.innerHeight / CANVAS_H,
         );
         document.body.style.transform = `scale(${scale})`;
         document.body.style.transformOrigin = "top left";
         document.documentElement.style.overflow = "hidden";
         document.documentElement.style.height = `${CANVAS_H * scale}px`;
-        document.documentElement.style.width = `${CANVAS_W * scale}px`;
+        document.documentElement.style.width = `${canvasW * scale}px`;
       }
       window.addEventListener("resize", () => {
-        fitViewport();
-        if (S.autoFit) requestAnimationFrame(applyAutoFit);
+        if (S.autoFit) applyAutoFit();
+        else fitViewport();
         requestAnimationFrame(generateSubmitQR);
       });
 
