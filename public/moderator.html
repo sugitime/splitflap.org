@@ -636,7 +636,12 @@
         const boardPill = document.getElementById("pill-board");
         const modPill = document.getElementById("pill-mod");
         const displayPill = document.getElementById("pill-display");
-        boardPill.textContent = data.boardOnline ? "Board online" : "Board offline";
+        const boardCount = data.boardCount || 0;
+        boardPill.textContent = data.boardOnline
+          ? boardCount > 1
+            ? `Board online (${boardCount})`
+            : "Board online"
+          : "Board offline";
         boardPill.className = "pill " + (data.boardOnline ? "on" : "off");
         const modCount = data.moderatorCount || 0;
         modPill.textContent = data.moderatorOnline

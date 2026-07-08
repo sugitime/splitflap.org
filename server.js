@@ -38,8 +38,18 @@ const AUTH = {
 };
 
 const sessions = new Map();
-let boardWs = null;
+const boardWsSet = new Set();
 const moderatorWsSet = new Set();
+
+function boardsOnline() {
+  return boardWsSet.size > 0;
+}
+
+function broadcastToBoards(payload) {
+  for (const ws of boardWsSet) {
+    safeSend(ws, payload);
+  }
+}
 const submissionQueue = [];
 const displayQueue = [];
 const messageHistory = [];
@@ -144,7 +154,8 @@ function queueSnapshot() {
       source: m.source || "public",
     })),
     nowPlaying,
-    boardOnline: !!(boardWs && boardWs.readyState === 1),
+    boardOnline: boardsOnline(),
+    boardCount: boardWsSet.size,
     moderatorOnline: moderatorWsSet.size > 0,
     moderatorCount: moderatorWsSet.size,
     history: historySnapshot(),
@@ -158,9 +169,8 @@ function notifyModerator() {
   }
 }
 
-function boardPlayEntry(entry, urgent = false) {
-  if (!boardWs || boardWs.readyState !== 1 || !entry) return;
-  safeSend(boardWs, {
+function boardPlayPayload(entry, urgent = false) {
+  return {
     type: "play_public_message",
     id: entry.id,
     text: entry.text,
@@ -168,7 +178,19 @@ function boardPlayEntry(entry, urgent = false) {
     indefinite: !!entry.indefinite,
     autocenter: !!entry.autocenter,
     urgent: !!urgent,
-  });
+  };
+}
+
+function boardPlayEntry(entry, urgent = false) {
+  if (!entry || !boardsOnline()) return;
+  broadcastToBoards(boardPlayPayload(entry, urgent));
+}
+
+function syncBoardState(ws) {
+  if (!ws || ws.readyState !== 1) return;
+  if (displayQueue.length) {
+    safeSend(ws, boardPlayPayload(displayQueue[0], true));
+  }
 }
 
 function playNextOnBoard() {
@@ -185,7 +207,8 @@ function advanceBoardAfterPlayingRemoved(removed) {
 }
 
 function clearBoardDisplay(id, urgent = false) {
-  safeSend(boardWs, {
+  if (!boardsOnline()) return;
+  broadcastToBoards({
     type: "clear_public_message",
     id: id || null,
     urgent: !!urgent,
@@ -211,12 +234,18 @@ function enqueueDisplay(entry) {
 }
 
 function onPublicMessageDone(id) {
+  let removed = false;
   if (displayQueue.length && displayQueue[0].id === id) {
     displayQueue.shift();
+    removed = true;
   } else {
     const idx = displayQueue.findIndex((m) => m.id === id);
-    if (idx !== -1) displayQueue.splice(idx, 1);
+    if (idx !== -1) {
+      displayQueue.splice(idx, 1);
+      removed = true;
+    }
   }
+  if (!removed) return;
   updateHistoryByMessageId(id, {
     endAction: "completed",
     endedAt: Date.now(),
@@ -228,7 +257,8 @@ function onPublicMessageDone(id) {
 app.get("/api/health", (_, res) => {
   res.json({
     ok: true,
-    boardOnline: !!(boardWs && boardWs.readyState === 1),
+    boardOnline: boardsOnline(),
+    boardCount: boardWsSet.size,
     pending: submissionQueue.length,
     display: displayQueue.length,
   });
@@ -265,7 +295,7 @@ app.post(
       res.status(400).json({ ok: false, error: "Message is required" });
       return;
     }
-    if (!boardWs || boardWs.readyState !== 1) {
+    if (!boardsOnline()) {
       res.status(503).json({ ok: false, error: "Board is offline" });
       return;
     }
@@ -335,7 +365,7 @@ app.post("/api/moderator/post", authMiddleware, (req, res) => {
     res.status(400).json({ ok: false, error: "Message is required" });
     return;
   }
-  if (!boardWs || boardWs.readyState !== 1) {
+  if (!boardsOnline()) {
     res.status(503).json({ ok: false, error: "Board is offline" });
     return;
   }
@@ -356,7 +386,7 @@ app.post("/api/moderator/post", authMiddleware, (req, res) => {
 });
 
 app.post("/api/moderator/clear", authMiddleware, (req, res) => {
-  if (!boardWs || boardWs.readyState !== 1) {
+  if (!boardsOnline()) {
     res.status(503).json({ ok: false, error: "Board is offline" });
     return;
   }
@@ -410,16 +440,11 @@ wss.on("connection", (ws) => {
 
     switch (msg.type) {
       case "register_board": {
-        if (boardWs && boardWs.readyState === 1) {
-          try {
-            boardWs.close();
-          } catch (_) {}
-        }
-        boardWs = ws;
+        boardWsSet.add(ws);
         ws.role = "board";
         safeSend(ws, { type: "registered" });
-        if (displayQueue.length) boardPlayEntry(displayQueue[0]);
-        console.log("Board connected");
+        syncBoardState(ws);
+        console.log(`Board connected (${boardWsSet.size} active)`);
         notifyModerator();
         break;
       }
@@ -452,9 +477,9 @@ wss.on("connection", (ws) => {
   });
 
   ws.on("close", () => {
-    if (ws === boardWs) {
-      boardWs = null;
-      console.log("Board disconnected");
+    if (ws.role === "board") {
+      boardWsSet.delete(ws);
+      console.log(`Board disconnected (${boardWsSet.size} active)`);
       notifyModerator();
     }
     if (ws.role === "moderator") {
