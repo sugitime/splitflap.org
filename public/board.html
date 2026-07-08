@@ -771,11 +771,10 @@
           const bw = grid.offsetWidth,
             bh = grid.offsetHeight;
           if (!bw || !bh) return;
-          const rect = boardArea.getBoundingClientRect();
-          const fr = Math.min(rect.width / bw, rect.height / bh);
+          const fr = CANVAS_H / bh;
           boardWrapper.style.width = bw + "px";
           boardWrapper.style.height = bh + "px";
-          boardWrapper.style.transform = `scale(${Math.min(fr, 2)})`;
+          boardWrapper.style.transform = `scale(${fr})`;
         });
       }
       const CANVAS_W = 6912,
