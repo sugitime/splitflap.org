@@ -232,12 +232,15 @@
       }
 
       const S = {
-        animDuration: 360,
+        animDuration: 140,
         animPerspective: 3000,
-        animStagger: 40,
+        animStagger: 8,
         animEasing: "ease-in-out",
         msgDelay: 20000,
-        fastSpeed: 25,
+        fastSpeed: 8,
+        urgentAnimDuration: 70,
+        urgentFastSpeed: 4,
+        urgentAnimStagger: 0,
         loopSequence: true,
         soundVolume: 0.8,
         soundRate: 1.5,
@@ -510,7 +513,36 @@
         animRAF = null,
         animT0 = 0,
         animTarget = null,
-        animDoneCb = null;
+        animDoneCb = null,
+        flipUrgent = false;
+      function charDisplay(ch) {
+        const isC = !!COLOR_MAP[ch];
+        return {
+          dc: isC ? "" : ch === " " ? "" : ch,
+          bg: isC ? COLOR_MAP[ch] : "",
+        };
+      }
+      function applyCharToCell(c, ch) {
+        if (!c) return;
+        const { dc, bg } = charDisplay(ch);
+        if (c.sTop) c.sTop.textContent = dc;
+        if (c.sBtm) c.sBtm.textContent = dc;
+        if (c.fTxt) c.fTxt.textContent = dc;
+        if (c.topBg) c.topBg.style.background = bg;
+        if (c.botBg) c.botBg.style.background = bg;
+        if (c.fallBg) c.fallBg.style.background = bg;
+        if (c.wrap) {
+          if (c.wrap._anim)
+            try {
+              c.wrap._anim.cancel();
+            } catch (_) {}
+          c.wrap.style.opacity = "0";
+          c.wrap.style.transform = "";
+        }
+      }
+      function syncCellsToChars(chars) {
+        chars.forEach((ch, i) => applyCharToCell(cellCache[i], ch));
+      }
       function scheduleAction(t, fn) {
         animQueue.push({ time: t, fn });
       }
@@ -527,6 +559,7 @@
           animRAF = null;
           currentChars = [...animTarget];
           isFlipping = false;
+          flipUrgent = false;
           if (animDoneCb) animDoneCb();
         }
       }
@@ -544,21 +577,14 @@
         animDoneCb = null;
         if (animTarget) {
           currentChars = [...animTarget];
+          syncCellsToChars(currentChars);
           animTarget = null;
         }
         isFlipping = false;
-        cellCache.forEach((c) => {
-          if (c && c.wrap && c.wrap._anim)
-            try {
-              c.wrap._anim.cancel();
-            } catch (_) {}
-          if (c && c.wrap) {
-            c.wrap.style.opacity = "0";
-            c.wrap.style.transform = "";
-          }
-        });
+        flipUrgent = false;
       }
       function getDelay(idx) {
+        if (flipUrgent) return 0;
         return (
           (idx % S.cols) * S.animStagger +
           Math.floor(idx / S.cols) * S.animStagger * 1.5
@@ -576,11 +602,15 @@
         if (steps < 0) steps += SPOOL.length;
         if (steps === 0 && oldChar !== newChar) steps = 1;
 
-        const path = [];
-        for (let i = 1; i <= steps; i++)
-          path.push(SPOOL[(oi + i) % SPOOL.length]);
-        if (!path.length || path[path.length - 1] !== (newChar || " "))
-          path.push(newChar || " ");
+        let path = [];
+        if (flipUrgent && steps > 0) {
+          path = [newChar || " "];
+        } else {
+          for (let i = 1; i <= steps; i++)
+            path.push(SPOOL[(oi + i) % SPOOL.length]);
+          if (!path.length || path[path.length - 1] !== (newChar || " "))
+            path.push(newChar || " ");
+        }
 
         let t = delay;
         // Reference the correct state object name:
@@ -589,8 +619,8 @@
         // Adjust the variable name to match your file, or use a
         // local alias like: const _S = (typeof S !== 'undefined') ? S : state;
         const _S = typeof S !== "undefined" ? S : state;
-        const FAST = _S.fastSpeed;
-        const FINAL = _S.animDuration;
+        const FAST = flipUrgent ? _S.urgentFastSpeed : _S.fastSpeed;
+        const FINAL = flipUrgent ? _S.urgentAnimDuration : _S.animDuration;
 
         path.forEach((char, i) => {
           const isLast = i === path.length - 1;
@@ -691,8 +721,9 @@
 
         return t;
       }
-      function flipToTarget(target, onDone) {
+      function flipToTarget(target, onDone, urgent) {
         cancelAnimLoop();
+        flipUrgent = !!urgent;
         isFlipping = true;
         const total = S.cols * S.rows;
         if (currentChars.length !== total) currentChars = blankGrid();
@@ -701,7 +732,9 @@
           if (currentChars[i] !== target[i]) changed.push(i);
         if (!changed.length) {
           isFlipping = false;
+          flipUrgent = false;
           currentChars = [...target];
+          syncCellsToChars(currentChars);
           if (onDone) onDone();
           return;
         }
@@ -954,28 +987,46 @@
         }
       }
 
-      function clearPublicMessage(id) {
-        if (id && currentPublicMessageId && id !== currentPublicMessageId) return;
+      function clearPublicMessage(id, urgent) {
+        if (
+          !urgent &&
+          id &&
+          currentPublicMessageId &&
+          id !== currentPublicMessageId
+        ) {
+          return;
+        }
         publicQueuePlaying = false;
         currentPublicMessageId = null;
         clearPublicQueueTimer();
-        flipToTarget(blankGrid(), () => {});
+        flipToTarget(blankGrid(), () => {}, urgent);
       }
 
-      function playPublicMessage(text, durationMs, id, indefinite, autocenter) {
+      function playPublicMessage(
+        text,
+        durationMs,
+        id,
+        indefinite,
+        autocenter,
+        urgent,
+      ) {
+        clearPublicQueueTimer();
         publicQueuePlaying = true;
         currentPublicMessageId = id;
-        clearPublicQueueTimer();
         const ms = indefinite
           ? 0
           : durationMs > 0
             ? durationMs
             : publicDisplayMs;
-        flipToTarget(messageToGrid(text, autocenter), () => {
-          if (!indefinite && ms > 0) {
-            publicQueueTimer = setTimeout(() => finishPublicMessage(id), ms);
-          }
-        });
+        flipToTarget(
+          messageToGrid(text, autocenter),
+          () => {
+            if (!indefinite && ms > 0) {
+              publicQueueTimer = setTimeout(() => finishPublicMessage(id), ms);
+            }
+          },
+          urgent,
+        );
       }
 
       let ws = null,
@@ -1005,10 +1056,11 @@
               msg.id,
               !!msg.indefinite,
               !!msg.autocenter,
+              !!msg.urgent,
             );
           }
           if (msg.type === "clear_public_message") {
-            clearPublicMessage(msg.id);
+            clearPublicMessage(msg.id, !!msg.urgent);
           }
         };
         ws.onclose = () => {

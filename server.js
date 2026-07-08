@@ -149,7 +149,7 @@ function notifyModerator() {
   }
 }
 
-function boardPlayEntry(entry) {
+function boardPlayEntry(entry, urgent = false) {
   if (!boardWs || boardWs.readyState !== 1 || !entry) return;
   safeSend(boardWs, {
     type: "play_public_message",
@@ -158,6 +158,7 @@ function boardPlayEntry(entry) {
     durationMs: entry.indefinite ? 0 : (entry.durationMs ?? PUBLIC_DISPLAY_MS),
     indefinite: !!entry.indefinite,
     autocenter: !!entry.autocenter,
+    urgent: !!urgent,
   });
 }
 
@@ -166,8 +167,12 @@ function playNextOnBoard() {
   boardPlayEntry(displayQueue[0]);
 }
 
-function clearBoardDisplay(id) {
-  safeSend(boardWs, { type: "clear_public_message", id: id || null });
+function clearBoardDisplay(id, urgent = false) {
+  safeSend(boardWs, {
+    type: "clear_public_message",
+    id: id || null,
+    urgent: !!urgent,
+  });
 }
 
 function parseModeratorDuration(body) {
@@ -328,7 +333,7 @@ app.post("/api/moderator/post", authMiddleware, (req, res) => {
   };
   recordQueuedMessage(entry, "moderator");
   displayQueue.unshift(entry);
-  boardPlayEntry(entry);
+  boardPlayEntry(entry, true);
   notifyModerator();
   res.json({ ok: true, message: entry });
 });
@@ -345,8 +350,11 @@ app.post("/api/moderator/clear", authMiddleware, (req, res) => {
       endedAt: Date.now(),
     });
   }
-  clearBoardDisplay(removed?.id);
-  playNextOnBoard();
+  if (displayQueue.length) {
+    boardPlayEntry(displayQueue[0], true);
+  } else {
+    clearBoardDisplay(removed?.id, true);
+  }
   notifyModerator();
   res.json({ ok: true, cleared: !!removed, id: removed?.id || null });
 });
