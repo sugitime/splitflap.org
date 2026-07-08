@@ -496,11 +496,21 @@
           animRAF = null;
         }
         animQueue = [];
+        animDoneCb = null;
+        if (animTarget) {
+          currentChars = [...animTarget];
+          animTarget = null;
+        }
+        isFlipping = false;
         cellCache.forEach((c) => {
           if (c && c.wrap && c.wrap._anim)
             try {
               c.wrap._anim.cancel();
             } catch (_) {}
+          if (c && c.wrap) {
+            c.wrap.style.opacity = "0";
+            c.wrap.style.transform = "";
+          }
         });
       }
       function getDelay(idx) {
@@ -637,10 +647,7 @@
         return t;
       }
       function flipToTarget(target, onDone) {
-        if (isFlipping) {
-          if (onDone) onDone();
-          return;
-        }
+        cancelAnimLoop();
         isFlipping = true;
         const total = S.cols * S.rows;
         if (currentChars.length !== total) currentChars = blankGrid();
@@ -649,10 +656,10 @@
           if (currentChars[i] !== target[i]) changed.push(i);
         if (!changed.length) {
           isFlipping = false;
+          currentChars = [...target];
           if (onDone) onDone();
           return;
         }
-        cancelAnimLoop();
         animTarget = target;
         animDoneCb = onDone || null;
         animQueue = [];
@@ -879,7 +886,11 @@
         publicQueuePlaying = true;
         currentPublicMessageId = id;
         clearPublicQueueTimer();
-        const ms = durationMs || publicDisplayMs;
+        const ms = indefinite
+          ? 0
+          : durationMs > 0
+            ? durationMs
+            : publicDisplayMs;
         flipToTarget(messageToGrid(text.toUpperCase()), () => {
           if (!indefinite && ms > 0) {
             publicQueueTimer = setTimeout(() => finishPublicMessage(id), ms);
@@ -939,7 +950,10 @@
       document.addEventListener("click", () => getAudioCtx(), { once: true });
 
       renderBoard();
-      applySettings(true);
+      lastStructKey = `${S.cols}|${S.rows}|${S.ridgeCount}`;
+      boardArea.style.backgroundColor = S.previewBg;
+      dynamicCSS.textContent = buildDynamicCSS();
+      if (S.autoFit) applyAutoFit();
       loadClickWav();
       fitViewport();
       generateSubmitQR();
