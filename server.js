@@ -86,6 +86,14 @@ function normalizeMessage(text) {
 }
 
 function queueSnapshot() {
+  const nowPlaying = displayQueue[0]
+    ? {
+        id: displayQueue[0].id,
+        text: displayQueue[0].text,
+        indefinite: !!displayQueue[0].indefinite,
+        durationMs: displayQueue[0].durationMs ?? PUBLIC_DISPLAY_MS,
+      }
+    : null;
   return {
     pending: submissionQueue.map((m) => ({
       id: m.id,
@@ -93,6 +101,7 @@ function queueSnapshot() {
       submittedAt: m.submittedAt,
     })),
     display: displayQueue.length,
+    nowPlaying,
     boardOnline: !!(boardWs && boardWs.readyState === 1),
     moderatorOnline: !!(moderatorWs && moderatorWs.readyState === 1),
   };
@@ -102,15 +111,36 @@ function notifyModerator() {
   safeSend(moderatorWs, { type: "queue_update", ...queueSnapshot() });
 }
 
-function playNextOnBoard() {
-  if (!boardWs || boardWs.readyState !== 1 || !displayQueue.length) return;
-  const entry = displayQueue[0];
+function boardPlayEntry(entry) {
+  if (!boardWs || boardWs.readyState !== 1 || !entry) return;
   safeSend(boardWs, {
     type: "play_public_message",
     id: entry.id,
     text: entry.text,
-    durationMs: PUBLIC_DISPLAY_MS,
+    durationMs: entry.indefinite ? 0 : (entry.durationMs ?? PUBLIC_DISPLAY_MS),
+    indefinite: !!entry.indefinite,
   });
+}
+
+function playNextOnBoard() {
+  if (!displayQueue.length) return;
+  boardPlayEntry(displayQueue[0]);
+}
+
+function clearBoardDisplay(id) {
+  safeSend(boardWs, { type: "clear_public_message", id: id || null });
+}
+
+function parseModeratorDuration(body) {
+  if (body?.indefinite) {
+    return { indefinite: true, durationMs: 0 };
+  }
+  const sec = Number.parseInt(body?.durationSeconds, 10);
+  const durationMs =
+    Number.isFinite(sec) && sec > 0
+      ? Math.min(sec * 1000, 24 * 60 * 60 * 1000)
+      : PUBLIC_DISPLAY_MS;
+  return { indefinite: false, durationMs };
 }
 
 function enqueueDisplay(entry) {
@@ -197,6 +227,8 @@ app.post("/api/moderator/approve/:id", authMiddleware, (req, res) => {
   }
   const entry = submissionQueue.splice(idx, 1)[0];
   entry.approvedAt = Date.now();
+  entry.durationMs = PUBLIC_DISPLAY_MS;
+  entry.indefinite = false;
   enqueueDisplay(entry);
   res.json({ ok: true, message: entry });
 });
@@ -210,6 +242,42 @@ app.post("/api/moderator/reject/:id", authMiddleware, (req, res) => {
   submissionQueue.splice(idx, 1);
   notifyModerator();
   res.json({ ok: true });
+});
+
+app.post("/api/moderator/post", authMiddleware, (req, res) => {
+  const text = normalizeMessage(req.body?.text);
+  if (!text) {
+    res.status(400).json({ ok: false, error: "Message is required" });
+    return;
+  }
+  if (!boardWs || boardWs.readyState !== 1) {
+    res.status(503).json({ ok: false, error: "Board is offline" });
+    return;
+  }
+  const timing = parseModeratorDuration(req.body);
+  const entry = {
+    id: genMessageId(),
+    text,
+    postedAt: Date.now(),
+    source: "moderator",
+    ...timing,
+  };
+  displayQueue.unshift(entry);
+  boardPlayEntry(entry);
+  notifyModerator();
+  res.json({ ok: true, message: entry });
+});
+
+app.post("/api/moderator/clear", authMiddleware, (req, res) => {
+  if (!boardWs || boardWs.readyState !== 1) {
+    res.status(503).json({ ok: false, error: "Board is offline" });
+    return;
+  }
+  const removed = displayQueue.length ? displayQueue.shift() : null;
+  clearBoardDisplay(removed?.id);
+  playNextOnBoard();
+  notifyModerator();
+  res.json({ ok: true, cleared: !!removed, id: removed?.id || null });
 });
 
 wss.on("connection", (ws) => {
@@ -239,6 +307,7 @@ wss.on("connection", (ws) => {
         boardWs = ws;
         ws.role = "board";
         safeSend(ws, { type: "registered" });
+        if (displayQueue.length) boardPlayEntry(displayQueue[0]);
         console.log("Board connected");
         notifyModerator();
         break;

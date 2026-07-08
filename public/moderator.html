@@ -30,7 +30,8 @@
         text-transform: uppercase;
         letter-spacing: 0.08em;
       }
-      input {
+      input,
+      textarea {
         width: 100%;
         padding: 12px;
         border-radius: 10px;
@@ -39,6 +40,82 @@
         color: #ededf0;
         font: inherit;
         margin-bottom: 12px;
+      }
+      textarea {
+        min-height: 100px;
+        resize: vertical;
+        font-family: "Roboto Mono", ui-monospace, monospace;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .field-row {
+        display: flex;
+        gap: 12px;
+        align-items: flex-end;
+        flex-wrap: wrap;
+      }
+      .field-row .field {
+        flex: 1 1 140px;
+        min-width: 120px;
+      }
+      .field-row .field input {
+        margin-bottom: 0;
+      }
+      .checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 4px 0 14px;
+        font-size: 14px;
+        color: #c8c8d0;
+      }
+      .checkbox-row input {
+        width: auto;
+        margin: 0;
+      }
+      .btn-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .btn-clear {
+        background: transparent;
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.35);
+      }
+      .now-playing {
+        border: 1px solid rgba(34, 197, 94, 0.25);
+        background: rgba(34, 197, 94, 0.06);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 16px;
+      }
+      .now-playing.empty {
+        border-color: #1e1e24;
+        background: #0c0c0f;
+        color: #8a8a96;
+      }
+      .now-playing-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #8a8a96;
+        margin-bottom: 8px;
+      }
+      .now-playing-text {
+        white-space: pre-wrap;
+        line-height: 1.5;
+        margin-bottom: 6px;
+      }
+      .now-playing-meta {
+        font-size: 12px;
+        color: #8a8a96;
+      }
+      .section-title {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: #ededf0;
       }
       button {
         border: none;
@@ -110,7 +187,7 @@
         <div class="toolbar">
           <div>
             <h1>Message Queue</h1>
-            <p class="sub">Approved messages show on the board for 20 seconds each.</p>
+            <p class="sub">Post directly to the board or approve public submissions.</p>
           </div>
           <button class="logout" id="logout-btn">Log out</button>
         </div>
@@ -119,6 +196,35 @@
           <span class="pill" id="pill-mod">Moderator</span>
           <span class="pill" id="pill-display">Display queue: 0</span>
         </div>
+
+        <div class="card">
+          <div class="section-title">Post to board</div>
+          <label for="mod-message">Message</label>
+          <textarea id="mod-message" placeholder="Type a message to show immediately on the board…"></textarea>
+          <div class="field-row">
+            <div class="field">
+              <label for="mod-duration">Display time (seconds)</label>
+              <input id="mod-duration" type="number" min="1" max="86400" value="20" />
+            </div>
+          </div>
+          <label class="checkbox-row">
+            <input type="checkbox" id="mod-indefinite" />
+            Post indefinitely
+          </label>
+          <div class="btn-row">
+            <button class="btn-primary" id="post-btn" type="button" style="width:auto;flex:1">Post now</button>
+            <button class="btn-clear" id="clear-btn" type="button">Clear current</button>
+          </div>
+          <div class="error" id="post-error"></div>
+        </div>
+
+        <div id="now-playing" class="now-playing empty">
+          <div class="now-playing-label">Now on board</div>
+          <div class="now-playing-text" id="now-playing-text">Nothing playing</div>
+          <div class="now-playing-meta" id="now-playing-meta"></div>
+        </div>
+
+        <div class="section-title">Pending approval</div>
         <div id="queue-list"></div>
       </div>
     </div>
@@ -167,6 +273,23 @@
         modPill.textContent = data.moderatorOnline ? "Connected" : "Reconnecting…";
         modPill.className = "pill " + (data.moderatorOnline ? "on" : "off");
         displayPill.textContent = `Display queue: ${data.display || 0}`;
+        renderNowPlaying(data.nowPlaying);
+      }
+      function renderNowPlaying(item) {
+        const box = document.getElementById("now-playing");
+        const textEl = document.getElementById("now-playing-text");
+        const metaEl = document.getElementById("now-playing-meta");
+        if (!item) {
+          box.className = "now-playing empty";
+          textEl.textContent = "Nothing playing";
+          metaEl.textContent = "";
+          return;
+        }
+        box.className = "now-playing";
+        textEl.textContent = item.text;
+        metaEl.textContent = item.indefinite
+          ? "Posted indefinitely"
+          : `Showing for ${Math.round((item.durationMs || 20000) / 1000)} seconds`;
       }
       function renderQueue(items) {
         if (!items?.length) {
@@ -267,6 +390,64 @@
         }
       });
       document.getElementById("logout-btn").addEventListener("click", logout);
+
+      const modMessage = document.getElementById("mod-message");
+      const modDuration = document.getElementById("mod-duration");
+      const modIndefinite = document.getElementById("mod-indefinite");
+      const postError = document.getElementById("post-error");
+
+      function syncDurationField() {
+        modDuration.disabled = modIndefinite.checked;
+        modDuration.style.opacity = modIndefinite.checked ? "0.45" : "1";
+      }
+      modIndefinite.addEventListener("change", syncDurationField);
+      syncDurationField();
+
+      async function refreshQueue() {
+        if (ws?.readyState === 1) {
+          ws.send(JSON.stringify({ type: "get_queue" }));
+        } else {
+          const { data } = await api("/api/moderator/queue");
+          handleQueueUpdate(data);
+        }
+      }
+
+      document.getElementById("post-btn").addEventListener("click", async () => {
+        postError.textContent = "";
+        const text = modMessage.value.trim();
+        if (!text) {
+          postError.textContent = "Enter a message to post.";
+          return;
+        }
+        try {
+          const body = {
+            text,
+            indefinite: modIndefinite.checked,
+          };
+          if (!modIndefinite.checked) {
+            body.durationSeconds = Number.parseInt(modDuration.value, 10) || 20;
+          }
+          await api("/api/moderator/post", {
+            method: "POST",
+            body: JSON.stringify(body),
+          });
+          modMessage.value = "";
+          await refreshQueue();
+        } catch (err) {
+          postError.textContent = err.message || "Could not post message";
+        }
+      });
+
+      document.getElementById("clear-btn").addEventListener("click", async () => {
+        postError.textContent = "";
+        if (!confirm("Remove the current message from the board immediately?")) return;
+        try {
+          await api("/api/moderator/clear", { method: "POST" });
+          await refreshQueue();
+        } catch (err) {
+          postError.textContent = err.message || "Could not clear message";
+        }
+      });
       queueList.addEventListener("click", async (e) => {
         const approveId = e.target.getAttribute("data-approve");
         const rejectId = e.target.getAttribute("data-reject");
@@ -276,12 +457,7 @@
           } else if (rejectId) {
             await api(`/api/moderator/reject/${rejectId}`, { method: "POST" });
           } else return;
-          if (ws?.readyState === 1) {
-            ws.send(JSON.stringify({ type: "get_queue" }));
-          } else {
-            const { data } = await api("/api/moderator/queue");
-            handleQueueUpdate(data);
-          }
+          await refreshQueue();
         } catch (err) {
           alert(err.message || "Action failed");
         }

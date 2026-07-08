@@ -286,7 +286,8 @@
       };
       let publicDisplayMs = 20000,
         publicQueuePlaying = false,
-        publicQueueTimer = null;
+        publicQueueTimer = null,
+        currentPublicMessageId = null;
 
       const boardWrapper = document.getElementById("vestaboard-wrapper");
       const boardArea = document.getElementById("board-area");
@@ -857,19 +858,32 @@
       }
 
       function finishPublicMessage(id) {
+        if (id && currentPublicMessageId && id !== currentPublicMessageId) return;
         publicQueuePlaying = false;
+        currentPublicMessageId = null;
         clearPublicQueueTimer();
         if (ws && ws.readyState === 1) {
           ws.send(JSON.stringify({ type: "public_message_done", id }));
         }
       }
 
-      function playPublicMessage(text, durationMs, id) {
+      function clearPublicMessage(id) {
+        if (id && currentPublicMessageId && id !== currentPublicMessageId) return;
+        publicQueuePlaying = false;
+        currentPublicMessageId = null;
+        clearPublicQueueTimer();
+        flipToTarget(blankGrid(), () => {});
+      }
+
+      function playPublicMessage(text, durationMs, id, indefinite) {
         publicQueuePlaying = true;
+        currentPublicMessageId = id;
         clearPublicQueueTimer();
         const ms = durationMs || publicDisplayMs;
         flipToTarget(messageToGrid(text.toUpperCase()), () => {
-          publicQueueTimer = setTimeout(() => finishPublicMessage(id), ms);
+          if (!indefinite && ms > 0) {
+            publicQueueTimer = setTimeout(() => finishPublicMessage(id), ms);
+          }
         });
       }
 
@@ -894,7 +908,15 @@
           }
           if (msg.type === "play_public_message" && typeof msg.text === "string") {
             getAudioCtx();
-            playPublicMessage(msg.text, msg.durationMs, msg.id);
+            playPublicMessage(
+              msg.text,
+              msg.durationMs,
+              msg.id,
+              !!msg.indefinite,
+            );
+          }
+          if (msg.type === "clear_public_message") {
+            clearPublicMessage(msg.id);
           }
         };
         ws.onclose = () => {
