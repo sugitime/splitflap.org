@@ -606,7 +606,12 @@
         const displayPill = document.getElementById("pill-display");
         boardPill.textContent = data.boardOnline ? "Board online" : "Board offline";
         boardPill.className = "pill " + (data.boardOnline ? "on" : "off");
-        modPill.textContent = data.moderatorOnline ? "Connected" : "Reconnecting…";
+        const modCount = data.moderatorCount || 0;
+        modPill.textContent = data.moderatorOnline
+          ? modCount > 1
+            ? `Connected (${modCount})`
+            : "Connected"
+          : "Reconnecting…";
         modPill.className = "pill " + (data.moderatorOnline ? "on" : "off");
         displayPill.textContent = `Display queue: ${data.display || 0}`;
         renderNowPlaying(data.nowPlaying);
@@ -746,10 +751,6 @@
           try { msg = JSON.parse(e.data); } catch (_) { return; }
           if (msg.type === "authenticated" || msg.type === "queue_update") {
             handleQueueUpdate(msg);
-          }
-          if (msg.type === "replaced") {
-            alert("Another moderator signed in.");
-            logout();
           }
           if (msg.type === "error") {
             loginError.textContent = msg.message || "Connection error";

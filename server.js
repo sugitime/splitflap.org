@@ -39,7 +39,7 @@ const AUTH = {
 
 const sessions = new Map();
 let boardWs = null;
-let moderatorWs = null;
+const moderatorWsSet = new Set();
 const submissionQueue = [];
 const displayQueue = [];
 const messageHistory = [];
@@ -136,13 +136,17 @@ function queueSnapshot() {
     display: displayQueue.length,
     nowPlaying,
     boardOnline: !!(boardWs && boardWs.readyState === 1),
-    moderatorOnline: !!(moderatorWs && moderatorWs.readyState === 1),
+    moderatorOnline: moderatorWsSet.size > 0,
+    moderatorCount: moderatorWsSet.size,
     history: historySnapshot(),
   };
 }
 
 function notifyModerator() {
-  safeSend(moderatorWs, { type: "queue_update", ...queueSnapshot() });
+  const payload = { type: "queue_update", ...queueSnapshot() };
+  for (const ws of moderatorWsSet) {
+    safeSend(ws, payload);
+  }
 }
 
 function boardPlayEntry(entry) {
@@ -386,16 +390,10 @@ wss.on("connection", (ws) => {
           safeSend(ws, { type: "error", message: "Invalid or expired login" });
           return;
         }
-        if (moderatorWs && moderatorWs !== ws && moderatorWs.readyState === 1) {
-          safeSend(moderatorWs, { type: "replaced" });
-          try {
-            moderatorWs.close();
-          } catch (_) {}
-        }
-        moderatorWs = ws;
+        moderatorWsSet.add(ws);
         ws.role = "moderator";
         safeSend(ws, { type: "authenticated", ...queueSnapshot() });
-        console.log("Moderator connected (auto-paired)");
+        console.log(`Moderator connected (${moderatorWsSet.size} active)`);
         break;
       }
 
@@ -419,9 +417,10 @@ wss.on("connection", (ws) => {
       console.log("Board disconnected");
       notifyModerator();
     }
-    if (ws === moderatorWs) {
-      moderatorWs = null;
-      console.log("Moderator disconnected");
+    if (ws.role === "moderator") {
+      moderatorWsSet.delete(ws);
+      console.log(`Moderator disconnected (${moderatorWsSet.size} active)`);
+      notifyModerator();
     }
   });
 
