@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width,initial-scale=1.0,user-scalable=no"
+      content="width=6912,height=1200,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"
     />
     <title>Split Flap Board</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -53,6 +53,9 @@
       body {
         width: 6912px;
         height: 1200px;
+        max-height: 1200px;
+        margin: 0;
+        padding: 0;
         overflow: hidden;
         background: #000;
         font-family: "Inter", sans-serif;
@@ -65,6 +68,7 @@
         top: 0;
         width: 1200px;
         height: 1200px;
+        max-height: 1200px;
         z-index: 60;
         display: flex;
         flex-direction: column;
@@ -72,23 +76,28 @@
         background: rgba(0, 0, 0, 0.92);
         border-right: 1px solid rgba(255, 255, 255, 0.08);
         pointer-events: none;
+        overflow: hidden;
       }
       .panel-slot {
-        flex: 1 1 50%;
+        flex: 0 0 50%;
+        height: 50%;
+        max-height: 600px;
         min-height: 0;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 28px 32px;
+        padding: 0 4px;
+        overflow: hidden;
       }
-      .panel-slot-qr {
+      .panel-slot-logo {
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       }
       .panel-slot .submit-qr-label {
         flex: 0 0 auto;
-        margin-bottom: 12px;
-        font-size: 20px;
+        margin: 2px 0 0;
+        font-size: 16px;
+        line-height: 1.1;
         color: rgba(255, 255, 255, 0.55);
         letter-spacing: 2px;
         text-transform: uppercase;
@@ -105,8 +114,8 @@
       }
       #submit-qr-container .submit-qr-frame {
         background: #fff;
-        padding: 14px;
-        border-radius: 14px;
+        padding: 4px;
+        border-radius: 8px;
         box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
         display: flex;
         align-items: center;
@@ -126,17 +135,19 @@
 
       /* Board */
       .board-area {
-        margin-left: 1200px;
+        margin: 0 0 0 1200px;
+        padding: 0;
         width: 5712px;
         height: 1200px;
+        max-height: 1200px;
         display: flex;
         justify-content: center;
-        align-items: center;
+        align-items: flex-start;
         overflow: hidden;
       }
       #vestaboard-wrapper {
         position: relative;
-        transform-origin: center center;
+        transform-origin: top center;
         transition: opacity 0.25s ease;
       }
       #vestaboard-wrapper.fading {
@@ -193,12 +204,12 @@
     </div>
 
     <div id="submit-qr-panel">
+      <div class="panel-slot panel-slot-logo">
+        <img src="dc-34-logo.avif" alt="DEF CON 34" />
+      </div>
       <div class="panel-slot panel-slot-qr">
         <div class="submit-qr-label">Submit a message</div>
         <div id="submit-qr-container"></div>
-      </div>
-      <div class="panel-slot panel-slot-logo">
-        <img src="dc-34-logo.avif" alt="DEF CON 34" />
       </div>
     </div>
 
@@ -778,7 +789,21 @@
           boardWrapper.style.transform = `scale(${Math.min(fr, 2)})`;
         });
       }
+      const CANVAS_W = 6912,
+        CANVAS_H = 1200;
+      function fitViewport() {
+        const scale = Math.min(
+          window.innerWidth / CANVAS_W,
+          window.innerHeight / CANVAS_H,
+        );
+        document.body.style.transform = `scale(${scale})`;
+        document.body.style.transformOrigin = "top left";
+        document.documentElement.style.overflow = "hidden";
+        document.documentElement.style.height = `${CANVAS_H * scale}px`;
+        document.documentElement.style.width = `${CANVAS_W * scale}px`;
+      }
       window.addEventListener("resize", () => {
+        fitViewport();
         if (S.autoFit) requestAnimationFrame(applyAutoFit);
         requestAnimationFrame(generateSubmitQR);
       });
@@ -825,8 +850,8 @@
         const container = document.getElementById("submit-qr-container");
         const url = `${location.origin}/submit.html`;
         const slot = document.querySelector(".panel-slot-qr");
-        const pad = 64;
-        const labelH = 36;
+        const pad = 8;
+        const labelH = 22;
         const size = Math.max(
           280,
           Math.min(
@@ -907,6 +932,7 @@
       renderBoard();
       applySettings(true);
       loadClickWav();
+      fitViewport();
       generateSubmitQR();
       connectWS();
     </script>
