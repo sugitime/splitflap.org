@@ -810,6 +810,10 @@
           if (S.autoFit) requestAnimationFrame(applyAutoFit);
         }
       }
+      const CANVAS_W = 6912,
+        CANVAS_H = 1200,
+        LEFT_PANEL_W = 1200,
+        BOARD_AREA_W = CANVAS_W - LEFT_PANEL_W;
       function applyAutoFit() {
         if (!S.autoFit) return;
         const grid = boardWrapper.querySelector(".vestaboard-grid");
@@ -821,14 +825,13 @@
           const bw = grid.offsetWidth,
             bh = grid.offsetHeight;
           if (!bw || !bh) return;
-          const fr = CANVAS_H / bh;
+          const areaW = boardArea.clientWidth || BOARD_AREA_W;
+          const fr = Math.min(areaW / bw, CANVAS_H / bh);
           boardWrapper.style.width = bw + "px";
           boardWrapper.style.height = bh + "px";
           boardWrapper.style.transform = `scale(${fr})`;
         });
       }
-      const CANVAS_W = 6912,
-        CANVAS_H = 1200;
       function fitViewport() {
         const scale = Math.min(
           window.innerWidth / CANVAS_W,
