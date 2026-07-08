@@ -276,6 +276,7 @@
         overflow: hidden;
       }
       .mini-cell.has-char { color: #999; }
+      .mini-cell.is-emoji { font-size: 9px; line-height: 1; }
       .row-counter {
         display: flex;
         gap: 4px;
@@ -439,6 +440,7 @@
         <div id="history-list"></div>
       </div>
     </div>
+    <script src="vestaboard-text.js"></script>
     <script>
       const TOKEN_KEY = "moderatorToken";
       const BOARD_COLS = 96;
@@ -581,6 +583,8 @@
             if (filled) used++;
             if (isColor) {
               html += `<div class="mini-cell is-color" style="background:${COLOR_MAP[ch]}"></div>`;
+            } else if (VestaboardText.isEmojiChar(ch)) {
+              html += `<div class="mini-cell has-char is-emoji">${escapeHtml(ch)}</div>`;
             } else if (filled) {
               html += `<div class="mini-cell has-char">${escapeHtml(ch)}</div>`;
             } else {

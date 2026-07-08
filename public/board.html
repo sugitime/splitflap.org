@@ -44,6 +44,7 @@
     />
     <meta name="twitter:image" content="image.png" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+    <script src="vestaboard-text.js"></script>
     <style>
       * {
         box-sizing: border-box;
@@ -458,7 +459,7 @@
         const lines = layoutMessageRows(msg, S.cols, S.rows, autocenter),
           g = [];
         for (let r = 0; r < S.rows; r++) {
-          let c = Array.from((lines[r] || "").toUpperCase());
+          let c = VestaboardText.normalizeGridLine(lines[r] || "");
           while (c.length < S.cols) c.push(" ");
           g.push(...c.slice(0, S.cols));
         }
@@ -475,10 +476,10 @@
           ridges += '<div class="ridge"></div>';
         let html = '<div class="vestaboard-grid">';
         currentChars.forEach((ch, i) => {
-          const isC = !!COLOR_MAP[ch],
-            dc = isC ? "" : ch === " " ? "" : ch,
-            bg = isC ? ` style="background:${COLOR_MAP[ch]}"` : "";
-          html += `<div class="rocker-scale-wrapper"><div class="rocker-switch" data-idx="${i}"><div class="bezel"><div class="bezel-highlight"></div></div><div class="recessed-hole-stroke"><div class="recessed-hole-bg"><div class="rocker-wrapper-top"><div class="rocker-top" data-role="top-bg"${bg}></div><div class="rocker-text rocker-text-top" data-role="static-top">${dc}</div></div><div class="rocker-wrapper-bot"><div class="rocker-bot" data-role="bot-bg"${bg}><div class="ridges">${ridges}</div></div><div class="rocker-text rocker-text-bot" data-role="static-bot">${dc}</div></div><div class="rocker-wrapper-falling"><div class="rocker-falling-front"><div class="rocker-top" data-role="falling-bg"${bg}></div><div class="rocker-text rocker-text-top" data-role="falling-txt">${dc}</div></div></div><div class="rocker-split-overlay"></div></div></div></div></div>`;
+          const disp = charDisplay(ch),
+            bg = disp.bg ? ` style="background:${disp.bg}"` : "",
+            emojiCls = disp.emoji ? " is-emoji" : "";
+          html += `<div class="rocker-scale-wrapper"><div class="rocker-switch" data-idx="${i}"><div class="bezel"><div class="bezel-highlight"></div></div><div class="recessed-hole-stroke"><div class="recessed-hole-bg"><div class="rocker-wrapper-top"><div class="rocker-top" data-role="top-bg"${bg}></div><div class="rocker-text rocker-text-top${emojiCls}" data-role="static-top">${disp.dc}</div></div><div class="rocker-wrapper-bot"><div class="rocker-bot" data-role="bot-bg"${bg}><div class="ridges">${ridges}</div></div><div class="rocker-text rocker-text-bot${emojiCls}" data-role="static-bot">${disp.dc}</div></div><div class="rocker-wrapper-falling"><div class="rocker-falling-front"><div class="rocker-top" data-role="falling-bg"${bg}></div><div class="rocker-text rocker-text-top${emojiCls}" data-role="falling-txt">${disp.dc}</div></div></div><div class="rocker-split-overlay"></div></div></div></div></div>`;
         });
         html += "</div>";
         boardWrapper.innerHTML = html;
@@ -513,17 +514,26 @@
         animDoneCb = null;
       function charDisplay(ch) {
         const isC = !!COLOR_MAP[ch];
+        const isEmoji = VestaboardText.isEmojiChar(ch);
         return {
           dc: isC ? "" : ch === " " ? "" : ch,
           bg: isC ? COLOR_MAP[ch] : "",
+          emoji: isEmoji,
         };
+      }
+      function setCellTexts(c, ch) {
+        if (!c) return;
+        const { dc, emoji } = charDisplay(ch);
+        [c.sTop, c.sBtm, c.fTxt].forEach((el) => {
+          if (!el) return;
+          el.textContent = dc;
+          el.classList.toggle("is-emoji", emoji);
+        });
       }
       function applyCharToCell(c, ch) {
         if (!c) return;
-        const { dc, bg } = charDisplay(ch);
-        if (c.sTop) c.sTop.textContent = dc;
-        if (c.sBtm) c.sBtm.textContent = dc;
-        if (c.fTxt) c.fTxt.textContent = dc;
+        const { bg } = charDisplay(ch);
+        setCellTexts(c, ch);
         if (c.topBg) c.topBg.style.background = bg;
         if (c.botBg) c.botBg.style.background = bg;
         if (c.fallBg) c.fallBg.style.background = bg;
@@ -595,11 +605,15 @@
         if (steps < 0) steps += SPOOL.length;
         if (steps === 0 && oldChar !== newChar) steps = 1;
 
-        const path = [];
-        for (let i = 1; i <= steps; i++)
-          path.push(SPOOL[(oi + i) % SPOOL.length]);
-        if (!path.length || path[path.length - 1] !== (newChar || " "))
-          path.push(newChar || " ");
+        let path = [];
+        if (VestaboardText.usesDirectFlip(oldChar, newChar)) {
+          if (oldChar !== newChar) path = [newChar || " "];
+        } else {
+          for (let i = 1; i <= steps; i++)
+            path.push(SPOOL[(oi + i) % SPOOL.length]);
+          if (!path.length || path[path.length - 1] !== (newChar || " "))
+            path.push(newChar || " ");
+        }
 
         let t = delay;
         // Reference the correct state object name:
@@ -634,12 +648,8 @@
           if (!isLast) {
             // ── INTERMEDIATE STEP: instant DOM swap, NO Animation object ──
             scheduleAction(capturedT, () => {
-              // Update top half to new char
-              if (c.sTop) c.sTop.textContent = dc;
+              setCellTexts(c, char);
               if (c.topBg) c.topBg.style.background = bg;
-              // Update bottom half to new char (no half-flip delay needed
-              // at 25ms — it's visually instant anyway)
-              if (c.sBtm) c.sBtm.textContent = dc;
               if (c.botBg) c.botBg.style.background = bg;
               // Audio: only every 3rd intermediate
               if (i % 3 === 0) {
@@ -654,10 +664,11 @@
           } else {
             // ── FINAL STEP: full falling-flap animation ──
             scheduleAction(capturedT, () => {
-              if (c.sTop) c.sTop.textContent = dc;
+              setCellTexts(c, char);
               if (c.topBg) c.topBg.style.background = bg;
               if (c.fTxt) c.fTxt.textContent = pdc;
               if (c.fallBg) c.fallBg.style.background = pbg;
+              if (c.fTxt) c.fTxt.classList.toggle("is-emoji", VestaboardText.isEmojiChar(prev));
 
               if (c.wrap) {
                 if (c.wrap._anim)
@@ -686,7 +697,10 @@
 
             // Halfway: update bottom half
             scheduleAction(capturedT + capturedSpeed * 0.5, () => {
-              if (c.sBtm) c.sBtm.textContent = dc;
+              if (c.sBtm) {
+                c.sBtm.textContent = dc;
+                c.sBtm.classList.toggle("is-emoji", VestaboardText.isEmojiChar(char));
+              }
               if (c.botBg) c.botBg.style.background = bg;
             });
 
@@ -700,7 +714,7 @@
                 c.wrap.style.opacity = "0";
                 c.wrap.style.transform = "";
               }
-              if (c.fTxt) c.fTxt.textContent = dc;
+              setCellTexts(c, char);
               if (c.fallBg) c.fallBg.style.background = bg;
             });
           }
@@ -805,7 +819,8 @@
           Math.round(v * 255)
             .toString(16)
             .padStart(2, "0");
-        return `.rocker-switch{width:${s.width}px;height:${s.height}px;border-radius:${s.outerRadius}px;background-color:${s.c_bg};${s.shadow > 0 ? `filter:drop-shadow(0 20px 30px rgba(0,0,0,${s.shadow}));` : ""}transform-style:preserve-3d}.bezel{left:${s.padBezel}px;top:${s.padBezel - 7}px;width:${s.width - s.padBezel * 2}px;height:${s.height - s.padBezel * 2 + 10}px;border-radius:${s.bezelRadius}px;background:linear-gradient(to bottom,${s.g_bezel1},${s.g_bezel2})}.bezel-highlight{inset:${s.highlightInset}px;border:${s.highlightInset > 0 ? "1px" : "0px"} solid rgba(255,255,255,.05);border-radius:${Math.max(0, s.bezelRadius - s.highlightInset)}px}.recessed-hole-stroke{left:${s.padHole}px;top:${s.padHole - 5}px;width:${hw}px;height:${hh}px;background-color:${s.c_holeStroke};-webkit-clip-path:${holeClip};clip-path:${holeClip}}.recessed-hole-bg{left:${s.strokeW}px;top:${s.strokeW}px;width:${ihw}px;height:${ihh}px;background-color:${s.c_holeBg};-webkit-clip-path:${holeBgClip};clip-path:${holeBgClip}}.rocker-wrapper-top{left:0;top:0;width:${ihw}px;height:${topH}px;overflow:hidden}.rocker-top{background:linear-gradient(to bottom,${s.g_top1},${s.g_top2});-webkit-clip-path:${topClip};clip-path:${topClip};transition:background 60ms}.rocker-wrapper-bot{left:0;top:${topH + s.gap}px;width:${ihw}px;height:${botH}px;overflow:hidden}.rocker-bot{background:linear-gradient(to bottom,${s.g_bot1} 0%,${s.g_bot2} 60%,${s.g_bot3} 100%);-webkit-clip-path:${botClip};clip-path:${botClip};transition:background 60ms}.rocker-wrapper-falling{left:0;top:0;width:${ihw}px;height:${topH}px;transform-origin:bottom center;z-index:5;transform-style:preserve-3d;opacity:0;pointer-events:none}.rocker-falling-front{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;-webkit-clip-path:${topClip};clip-path:${topClip};overflow:hidden}.rocker-split-overlay{position:absolute;left:0;width:${ihw}px;top:${topH}px;height:${s.gap}px;background-color:${s.c_holeBg};z-index:20;pointer-events:none;box-shadow:0 -1px 2px rgba(0,0,0,.9),0 1px 2px rgba(0,0,0,.9)}.ridges{bottom:${s.ridgeBottom}px;left:${s.ridgeMargin}px;width:calc(100% - ${s.ridgeMargin * 2}px);height:${s.ridgeHeight * s.ridgeCount + s.ridgeGap * (s.ridgeCount - 1)}px}.ridge{height:${s.ridgeHeight}px;margin-bottom:${s.ridgeGap}px;border-radius:${s.ridgeRadius}px;background:linear-gradient(to bottom,${s.r1}${rh(s.ridgeShadow)} 0%,${s.r2}05 20%,${s.r3}66 70%,${s.r4}e6 100%);border-top:${s.ridgeShadow > 0 ? "1px solid rgba(255,255,255," + s.ridgeShadow + ")" : "none"}}.vestaboard-grid{display:grid;grid-template-columns:repeat(${s.cols},auto);gap:${s.gridGap}px;padding:${s.boardPad}px;background-color:${s.boardBg};${s.boardShadow > 0 ? `box-shadow:0 10px 30px -5px rgba(0,0,0,${s.boardShadow}),0 4px 10px rgba(0,0,0,${s.boardShadow * 0.5});` : ""}border-radius:${s.boardRadius}px}.rocker-scale-wrapper{perspective:${s.animPerspective}px;width:calc(${s.width}px*${s.scale});height:calc(${s.height}px*${s.scale});position:relative}.rocker-switch{transform:scale(${s.scale});transform-origin:top left}.rocker-text{position:absolute;width:${ihw}px;height:${ihh}px;display:flex;justify-content:center;align-items:center;z-index:10;pointer-events:none;font-family:${s.fontFamily};font-size:${s.fontSize}px;font-weight:${s.fontWeight};color:${s.fontColor};transform:translate(${s.fontX}px,${s.fontY}px);line-height:1;text-align:center;transition:opacity 80ms}.rocker-text-top{top:0;left:0}.rocker-text-bot{top:-${topH + s.gap}px;left:0}`;
+        const emojiSize = Math.round(s.fontSize * 0.68);
+        return `.rocker-switch{width:${s.width}px;height:${s.height}px;border-radius:${s.outerRadius}px;background-color:${s.c_bg};${s.shadow > 0 ? `filter:drop-shadow(0 20px 30px rgba(0,0,0,${s.shadow}));` : ""}transform-style:preserve-3d}.bezel{left:${s.padBezel}px;top:${s.padBezel - 7}px;width:${s.width - s.padBezel * 2}px;height:${s.height - s.padBezel * 2 + 10}px;border-radius:${s.bezelRadius}px;background:linear-gradient(to bottom,${s.g_bezel1},${s.g_bezel2})}.bezel-highlight{inset:${s.highlightInset}px;border:${s.highlightInset > 0 ? "1px" : "0px"} solid rgba(255,255,255,.05);border-radius:${Math.max(0, s.bezelRadius - s.highlightInset)}px}.recessed-hole-stroke{left:${s.padHole}px;top:${s.padHole - 5}px;width:${hw}px;height:${hh}px;background-color:${s.c_holeStroke};-webkit-clip-path:${holeClip};clip-path:${holeClip}}.recessed-hole-bg{left:${s.strokeW}px;top:${s.strokeW}px;width:${ihw}px;height:${ihh}px;background-color:${s.c_holeBg};-webkit-clip-path:${holeBgClip};clip-path:${holeBgClip}}.rocker-wrapper-top{left:0;top:0;width:${ihw}px;height:${topH}px;overflow:hidden}.rocker-top{background:linear-gradient(to bottom,${s.g_top1},${s.g_top2});-webkit-clip-path:${topClip};clip-path:${topClip};transition:background 60ms}.rocker-wrapper-bot{left:0;top:${topH + s.gap}px;width:${ihw}px;height:${botH}px;overflow:hidden}.rocker-bot{background:linear-gradient(to bottom,${s.g_bot1} 0%,${s.g_bot2} 60%,${s.g_bot3} 100%);-webkit-clip-path:${botClip};clip-path:${botClip};transition:background 60ms}.rocker-wrapper-falling{left:0;top:0;width:${ihw}px;height:${topH}px;transform-origin:bottom center;z-index:5;transform-style:preserve-3d;opacity:0;pointer-events:none}.rocker-falling-front{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;-webkit-clip-path:${topClip};clip-path:${topClip};overflow:hidden}.rocker-split-overlay{position:absolute;left:0;width:${ihw}px;top:${topH}px;height:${s.gap}px;background-color:${s.c_holeBg};z-index:20;pointer-events:none;box-shadow:0 -1px 2px rgba(0,0,0,.9),0 1px 2px rgba(0,0,0,.9)}.ridges{bottom:${s.ridgeBottom}px;left:${s.ridgeMargin}px;width:calc(100% - ${s.ridgeMargin * 2}px);height:${s.ridgeHeight * s.ridgeCount + s.ridgeGap * (s.ridgeCount - 1)}px}.ridge{height:${s.ridgeHeight}px;margin-bottom:${s.ridgeGap}px;border-radius:${s.ridgeRadius}px;background:linear-gradient(to bottom,${s.r1}${rh(s.ridgeShadow)} 0%,${s.r2}05 20%,${s.r3}66 70%,${s.r4}e6 100%);border-top:${s.ridgeShadow > 0 ? "1px solid rgba(255,255,255," + s.ridgeShadow + ")" : "none"}}.vestaboard-grid{display:grid;grid-template-columns:repeat(${s.cols},auto);gap:${s.gridGap}px;padding:${s.boardPad}px;background-color:${s.boardBg};${s.boardShadow > 0 ? `box-shadow:0 10px 30px -5px rgba(0,0,0,${s.boardShadow}),0 4px 10px rgba(0,0,0,${s.boardShadow * 0.5});` : ""}border-radius:${s.boardRadius}px}.rocker-scale-wrapper{perspective:${s.animPerspective}px;width:calc(${s.width}px*${s.scale});height:calc(${s.height}px*${s.scale});position:relative}.rocker-switch{transform:scale(${s.scale});transform-origin:top left}.rocker-text{position:absolute;width:${ihw}px;height:${ihh}px;display:flex;justify-content:center;align-items:center;z-index:10;pointer-events:none;font-family:${s.fontFamily},"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;font-size:${s.fontSize}px;font-weight:${s.fontWeight};color:${s.fontColor};transform:translate(${s.fontX}px,${s.fontY}px);line-height:1;text-align:center;transition:opacity 80ms}.rocker-text.is-emoji{font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;font-size:${emojiSize}px;font-weight:400}.rocker-text-top{top:0;left:0}.rocker-text-bot{top:-${topH + s.gap}px;left:0}`;
       }
 
       let lastStructKey = "",

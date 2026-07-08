@@ -102,6 +102,10 @@
         min-width: 0;
         overflow: hidden;
       }
+      .mini-cell.is-emoji {
+        font-size: 9px;
+        line-height: 1;
+      }
       .mini-cell.has-char {
         color: #999;
       }
@@ -266,6 +270,7 @@
       <div class="status" id="status"></div>
     </div>
 
+    <script src="vestaboard-text.js"></script>
     <script>
       const BOARD_COLS = 96;
       const BOARD_ROWS = 5;
@@ -379,6 +384,8 @@
             if (filled) used++;
             if (isColor) {
               html += `<div class="mini-cell is-color" style="background:${COLOR_MAP[ch]}"></div>`;
+            } else if (VestaboardText.isEmojiChar(ch)) {
+              html += `<div class="mini-cell has-char is-emoji">${escapeHtml(ch)}</div>`;
             } else if (filled) {
               html += `<div class="mini-cell has-char">${escapeHtml(ch)}</div>`;
             } else {
