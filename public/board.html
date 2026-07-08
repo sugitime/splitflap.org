@@ -416,8 +416,43 @@
         }
         return result;
       }
-      function messageToGrid(msg) {
-        const lines = wrapMessageToRows(msg, S.cols, S.rows),
+      function isEmptyRow(line) {
+        return !line || Array.from(line).every((ch) => ch === " ");
+      }
+      function centerLine(line, cols) {
+        const chars = Array.from(line);
+        let end = chars.length;
+        while (end > 0 && chars[end - 1] === " ") end--;
+        let start = 0;
+        while (start < end && chars[start] === " ") start++;
+        const content = chars.slice(start, end);
+        if (!content.length) return "";
+        const leftPad = Math.floor((cols - content.length) / 2);
+        const out = Array(leftPad).fill(" ").concat(content);
+        while (out.length < cols) out.push(" ");
+        return out.slice(0, cols).join("");
+      }
+      function layoutMessageRows(msg, cols, rows, autocenter) {
+        const wrapped = wrapMessageToRows(msg, cols);
+        if (!autocenter) {
+          const result = [];
+          for (let r = 0; r < rows; r++) result.push(wrapped[r] || "");
+          return result;
+        }
+        let lines = wrapped.slice();
+        while (lines.length && isEmptyRow(lines[0])) lines.shift();
+        while (lines.length && isEmptyRow(lines[lines.length - 1])) lines.pop();
+        if (!lines.length) return Array(rows).fill("");
+        const centered = lines.map((line) => centerLine(line, cols));
+        const topPad = Math.floor((rows - centered.length) / 2);
+        const result = [];
+        for (let i = 0; i < topPad; i++) result.push("");
+        result.push(...centered);
+        while (result.length < rows) result.push("");
+        return result.slice(0, rows);
+      }
+      function messageToGrid(msg, autocenter) {
+        const lines = layoutMessageRows(msg, S.cols, S.rows, autocenter),
           g = [];
         for (let r = 0; r < S.rows; r++) {
           let c = Array.from((lines[r] || "").toUpperCase());
@@ -889,7 +924,7 @@
         flipToTarget(blankGrid(), () => {});
       }
 
-      function playPublicMessage(text, durationMs, id, indefinite) {
+      function playPublicMessage(text, durationMs, id, indefinite, autocenter) {
         publicQueuePlaying = true;
         currentPublicMessageId = id;
         clearPublicQueueTimer();
@@ -898,7 +933,7 @@
           : durationMs > 0
             ? durationMs
             : publicDisplayMs;
-        flipToTarget(messageToGrid(text.toUpperCase()), () => {
+        flipToTarget(messageToGrid(text, autocenter), () => {
           if (!indefinite && ms > 0) {
             publicQueueTimer = setTimeout(() => finishPublicMessage(id), ms);
           }
@@ -931,6 +966,7 @@
               msg.durationMs,
               msg.id,
               !!msg.indefinite,
+              !!msg.autocenter,
             );
           }
           if (msg.type === "clear_public_message") {

@@ -345,6 +345,11 @@
           <div class="color-label">Color blocks</div>
           <div class="color-blocks" id="color-insert-row"></div>
 
+          <label class="checkbox-row">
+            <input type="checkbox" id="mod-autocenter" />
+            Autocenter text
+          </label>
+
           <div class="field-row">
             <div class="field">
               <label for="mod-duration">Display time (seconds)</label>
@@ -428,6 +433,44 @@
         return result;
       }
 
+      function isEmptyRow(line) {
+        return !line || Array.from(line).every((ch) => ch === " ");
+      }
+
+      function centerLine(line, cols) {
+        const chars = Array.from(line);
+        let end = chars.length;
+        while (end > 0 && chars[end - 1] === " ") end--;
+        let start = 0;
+        while (start < end && chars[start] === " ") start++;
+        const content = chars.slice(start, end);
+        if (!content.length) return "";
+        const leftPad = Math.floor((cols - content.length) / 2);
+        const out = Array(leftPad).fill(" ").concat(content);
+        while (out.length < cols) out.push(" ");
+        return out.slice(0, cols).join("");
+      }
+
+      function layoutMessageRows(msg, cols, rows, autocenter) {
+        const wrapped = wrapMessageToRows(msg, cols);
+        if (!autocenter) {
+          const result = [];
+          for (let r = 0; r < rows; r++) result.push(wrapped[r] || "");
+          return result;
+        }
+        let lines = wrapped.slice();
+        while (lines.length && isEmptyRow(lines[0])) lines.shift();
+        while (lines.length && isEmptyRow(lines[lines.length - 1])) lines.pop();
+        if (!lines.length) return Array(rows).fill("");
+        const centered = lines.map((line) => centerLine(line, cols));
+        const topPad = Math.floor((rows - centered.length) / 2);
+        const result = [];
+        for (let i = 0; i < topPad; i++) result.push("");
+        result.push(...centered);
+        while (result.length < rows) result.push("");
+        return result.slice(0, rows);
+      }
+
       function updateMiniBoard() {
         const messageEl = document.getElementById("mod-message");
         const miniGrid = document.getElementById("mini-grid");
@@ -435,6 +478,7 @@
         const boardInfo = document.getElementById("board-info");
         if (!messageEl || !miniGrid) return;
 
+        const autocenter = document.getElementById("mod-autocenter")?.checked;
         const wrappedRows = wrapMessageToRows(messageEl.value, BOARD_COLS);
         const overCapacity = wrappedRows.length > BOARD_ROWS;
         boardInfo.textContent = overCapacity
@@ -446,8 +490,14 @@
 
         let html = "";
         const rc = [];
+        const displayRows = layoutMessageRows(
+          messageEl.value,
+          BOARD_COLS,
+          BOARD_ROWS,
+          autocenter,
+        );
         for (let r = 0; r < BOARD_ROWS; r++) {
-          const lineChars = Array.from(wrappedRows[r] || "");
+          const lineChars = Array.from(displayRows[r] || "");
           let used = 0;
           for (let c = 0; c < BOARD_COLS; c++) {
             const ch = lineChars[c] || " ";
@@ -647,6 +697,7 @@
       syncDurationField();
       modMessage.addEventListener("input", updateMiniBoard);
       modMessage.addEventListener("focus", updateMiniBoard);
+      document.getElementById("mod-autocenter").addEventListener("change", updateMiniBoard);
       renderColorBlocks();
 
       async function refreshQueue() {
@@ -675,6 +726,7 @@
           const body = {
             text,
             indefinite: modIndefinite.checked,
+            autocenter: document.getElementById("mod-autocenter").checked,
           };
           if (!modIndefinite.checked) {
             body.durationSeconds = Number.parseInt(modDuration.value, 10) || 20;

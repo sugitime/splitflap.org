@@ -179,6 +179,18 @@
       .color-block:active {
         transform: scale(1.12);
       }
+      .checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 8px 0 4px;
+        font-size: 14px;
+        color: var(--text);
+      }
+      .checkbox-row input {
+        width: auto;
+        margin: 0;
+      }
 
       .submit-btn {
         width: 100%;
@@ -242,6 +254,11 @@
         <div class="color-label">Color blocks</div>
         <div class="color-blocks" id="color-insert-row"></div>
 
+        <label class="checkbox-row">
+          <input type="checkbox" id="autocenter" />
+          Autocenter text
+        </label>
+
         <button type="submit" class="submit-btn" id="submit-btn">
           Submit for approval
         </button>
@@ -293,8 +310,47 @@
         return result;
       }
 
+      function isEmptyRow(line) {
+        return !line || Array.from(line).every((ch) => ch === " ");
+      }
+
+      function centerLine(line, cols) {
+        const chars = Array.from(line);
+        let end = chars.length;
+        while (end > 0 && chars[end - 1] === " ") end--;
+        let start = 0;
+        while (start < end && chars[start] === " ") start++;
+        const content = chars.slice(start, end);
+        if (!content.length) return "";
+        const leftPad = Math.floor((cols - content.length) / 2);
+        const out = Array(leftPad).fill(" ").concat(content);
+        while (out.length < cols) out.push(" ");
+        return out.slice(0, cols).join("");
+      }
+
+      function layoutMessageRows(msg, cols, rows, autocenter) {
+        const wrapped = wrapMessageToRows(msg, cols);
+        if (!autocenter) {
+          const result = [];
+          for (let r = 0; r < rows; r++) result.push(wrapped[r] || "");
+          return result;
+        }
+        let lines = wrapped.slice();
+        while (lines.length && isEmptyRow(lines[0])) lines.shift();
+        while (lines.length && isEmptyRow(lines[lines.length - 1])) lines.pop();
+        if (!lines.length) return Array(rows).fill("");
+        const centered = lines.map((line) => centerLine(line, cols));
+        const topPad = Math.floor((rows - centered.length) / 2);
+        const result = [];
+        for (let i = 0; i < topPad; i++) result.push("");
+        result.push(...centered);
+        while (result.length < rows) result.push("");
+        return result.slice(0, rows);
+      }
+
       function updateMiniBoard() {
         const msg = messageEl.value;
+        const autocenter = document.getElementById("autocenter").checked;
         const wrappedRows = wrapMessageToRows(msg, BOARD_COLS);
         const overCapacity = wrappedRows.length > BOARD_ROWS;
         const boardInfo = document.getElementById("board-info");
@@ -307,8 +363,14 @@
 
         let html = "";
         const rc = [];
+        const displayRows = layoutMessageRows(
+          msg,
+          BOARD_COLS,
+          BOARD_ROWS,
+          autocenter,
+        );
         for (let r = 0; r < BOARD_ROWS; r++) {
-          const lineChars = Array.from(wrappedRows[r] || "");
+          const lineChars = Array.from(displayRows[r] || "");
           let used = 0;
           for (let c = 0; c < BOARD_COLS; c++) {
             const ch = lineChars[c] || " ";
@@ -360,6 +422,7 @@
 
       messageEl.addEventListener("input", updateMiniBoard);
       messageEl.addEventListener("focus", updateMiniBoard);
+      document.getElementById("autocenter").addEventListener("change", updateMiniBoard);
 
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -381,7 +444,10 @@
           const res = await fetch("/api/submit-message", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text }),
+            body: JSON.stringify({
+              text,
+              autocenter: document.getElementById("autocenter").checked,
+            }),
           });
           const data = await res.json();
           if (!res.ok || !data.ok) throw new Error(data.error || "Submit failed");

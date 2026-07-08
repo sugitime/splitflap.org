@@ -119,6 +119,7 @@ function boardPlayEntry(entry) {
     text: entry.text,
     durationMs: entry.indefinite ? 0 : (entry.durationMs ?? PUBLIC_DISPLAY_MS),
     indefinite: !!entry.indefinite,
+    autocenter: !!entry.autocenter,
   });
 }
 
@@ -207,6 +208,7 @@ app.post(
     const entry = {
       id: genMessageId(),
       text,
+      autocenter: !!req.body?.autocenter,
       submittedAt: Date.now(),
     };
     submissionQueue.push(entry);
@@ -258,6 +260,7 @@ app.post("/api/moderator/post", authMiddleware, (req, res) => {
   const entry = {
     id: genMessageId(),
     text,
+    autocenter: !!req.body?.autocenter,
     postedAt: Date.now(),
     source: "moderator",
     ...timing,
