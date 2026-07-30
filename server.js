@@ -14,6 +14,20 @@ app.use(
   helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }),
 );
 app.use(express.json({ limit: "16kb" }));
+
+// Health must stay outside the API rate limiter. Render probes /api/health
+// frequently; if those probes get 429, the proxy marks the service unhealthy
+// and clients see 502 Bad Gateway.
+app.get("/api/health", (_, res) => {
+  res.json({
+    ok: true,
+    boardOnline: boardsOnline(),
+    boardCount: boardWsSet.size,
+    pending: submissionQueue.length,
+    display: displayQueue.length,
+  });
+});
+
 app.use(
   "/api/",
   rateLimit({
@@ -21,6 +35,7 @@ app.use(
     max: 200,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) => req.path === "/health" || req.path === "/api/health",
   }),
 );
 app.use(express.static(path.join(__dirname, "public")));
@@ -253,16 +268,6 @@ function onPublicMessageDone(id) {
   playNextOnBoard();
   notifyModerator();
 }
-
-app.get("/api/health", (_, res) => {
-  res.json({
-    ok: true,
-    boardOnline: boardsOnline(),
-    boardCount: boardWsSet.size,
-    pending: submissionQueue.length,
-    display: displayQueue.length,
-  });
-});
 
 app.post("/api/auth/moderator", (req, res) => {
   const { username, password } = req.body || {};
