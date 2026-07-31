@@ -38,6 +38,9 @@ app.use(
     skip: (req) => req.path === "/health" || req.path === "/api/health",
   }),
 );
+app.get(["/", "/index.html"], (_req, res) => {
+  res.redirect(302, "/submit.html");
+});
 app.use(express.static(path.join(__dirname, "public")));
 
 const SESSION_TTL = 12 * 60 * 60 * 1000;
