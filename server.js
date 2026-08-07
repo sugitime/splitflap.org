@@ -45,15 +45,39 @@ app.use(express.static(path.join(__dirname, "public")));
 
 const SESSION_TTL = 12 * 60 * 60 * 1000;
 const PUBLIC_MSG_MAX = 500;
-const PUBLIC_DISPLAY_MS = 20000;
 const HISTORY_MAX = 200;
+const DISPLAY_MS_MIN = 1000;
+const DISPLAY_MS_MAX = 24 * 60 * 60 * 1000;
+const DISPLAY_MS_DEFAULT = 20000;
+
+function parseDisplayMs(value, fallback = DISPLAY_MS_DEFAULT) {
+  const n = Number.parseInt(value, 10);
+  if (!Number.isFinite(n)) return fallback;
+  if (n < DISPLAY_MS_MIN || n > DISPLAY_MS_MAX) return fallback;
+  return n;
+}
+
+/** Default how long approved public messages stay on the board (ms). */
+let publicDisplayMs = parseDisplayMs(
+  process.env.PUBLIC_DISPLAY_MS,
+  DISPLAY_MS_DEFAULT,
+);
 
 const AUTH = {
   moderator: {
     username: process.env.MODERATOR_USERNAME || "moderator",
-    password: process.env.MODERATOR_PASSWORD || "moderator123",
+    // Prefer MODERATOR_PASSWORD env in production. Fallback is intentionally long/random.
+    password:
+      process.env.MODERATOR_PASSWORD || "zvOe0NUP86Y4uu90wbr5hyqV",
   },
 };
+
+function settingsSnapshot() {
+  return {
+    publicDisplayMs,
+    publicDisplaySeconds: Math.round(publicDisplayMs / 1000),
+  };
+}
 
 const sessions = new Map();
 const boardWsSet = new Set();
@@ -95,7 +119,7 @@ function recordQueuedMessage(entry, source) {
     source,
     action: "queued",
     autocenter: !!entry.autocenter,
-    durationMs: entry.indefinite ? 0 : (entry.durationMs ?? PUBLIC_DISPLAY_MS),
+    durationMs: entry.indefinite ? 0 : (entry.durationMs ?? publicDisplayMs),
     indefinite: !!entry.indefinite,
     at: Date.now(),
     endedAt: null,
@@ -152,7 +176,7 @@ function queueSnapshot() {
         id: displayQueue[0].id,
         text: displayQueue[0].text,
         indefinite: !!displayQueue[0].indefinite,
-        durationMs: displayQueue[0].durationMs ?? PUBLIC_DISPLAY_MS,
+        durationMs: displayQueue[0].durationMs ?? publicDisplayMs,
       }
     : null;
   return {
@@ -168,7 +192,7 @@ function queueSnapshot() {
       position: i + 1,
       playing: i === 0,
       indefinite: !!m.indefinite,
-      durationMs: m.durationMs ?? PUBLIC_DISPLAY_MS,
+      durationMs: m.durationMs ?? publicDisplayMs,
       source: m.source || "public",
     })),
     nowPlaying,
@@ -177,6 +201,7 @@ function queueSnapshot() {
     moderatorOnline: moderatorWsSet.size > 0,
     moderatorCount: moderatorWsSet.size,
     history: historySnapshot(),
+    settings: settingsSnapshot(),
   };
 }
 
@@ -192,7 +217,7 @@ function boardPlayPayload(entry, urgent = false) {
     type: "play_public_message",
     id: entry.id,
     text: entry.text,
-    durationMs: entry.indefinite ? 0 : (entry.durationMs ?? PUBLIC_DISPLAY_MS),
+    durationMs: entry.indefinite ? 0 : (entry.durationMs ?? publicDisplayMs),
     indefinite: !!entry.indefinite,
     autocenter: !!entry.autocenter,
     urgent: !!urgent,
@@ -240,8 +265,8 @@ function parseModeratorDuration(body) {
   const sec = Number.parseInt(body?.durationSeconds, 10);
   const durationMs =
     Number.isFinite(sec) && sec > 0
-      ? Math.min(sec * 1000, 24 * 60 * 60 * 1000)
-      : PUBLIC_DISPLAY_MS;
+      ? Math.min(Math.max(sec * 1000, DISPLAY_MS_MIN), DISPLAY_MS_MAX)
+      : publicDisplayMs;
   return { indefinite: false, durationMs };
 }
 
@@ -339,11 +364,51 @@ app.post("/api/moderator/approve/:id", authMiddleware, (req, res) => {
   }
   const entry = submissionQueue.splice(idx, 1)[0];
   entry.approvedAt = Date.now();
-  entry.durationMs = PUBLIC_DISPLAY_MS;
+  entry.durationMs = publicDisplayMs;
   entry.indefinite = false;
   recordQueuedMessage(entry, "public");
   enqueueDisplay(entry);
   res.json({ ok: true, message: entry });
+});
+
+app.get("/api/moderator/settings", authMiddleware, (_req, res) => {
+  res.json({ ok: true, ...settingsSnapshot() });
+});
+
+app.put("/api/moderator/settings", authMiddleware, (req, res) => {
+  const body = req.body || {};
+  let nextMs = publicDisplayMs;
+
+  if (body.publicDisplaySeconds != null) {
+    const sec = Number.parseInt(body.publicDisplaySeconds, 10);
+    if (!Number.isFinite(sec) || sec < 1 || sec > 86400) {
+      res.status(400).json({
+        ok: false,
+        error: "publicDisplaySeconds must be between 1 and 86400",
+      });
+      return;
+    }
+    nextMs = sec * 1000;
+  } else if (body.publicDisplayMs != null) {
+    nextMs = parseDisplayMs(body.publicDisplayMs, NaN);
+    if (!Number.isFinite(nextMs)) {
+      res.status(400).json({
+        ok: false,
+        error: `publicDisplayMs must be between ${DISPLAY_MS_MIN} and ${DISPLAY_MS_MAX}`,
+      });
+      return;
+    }
+  } else {
+    res.status(400).json({
+      ok: false,
+      error: "Provide publicDisplaySeconds (or publicDisplayMs)",
+    });
+    return;
+  }
+
+  publicDisplayMs = nextMs;
+  notifyModerator();
+  res.json({ ok: true, ...settingsSnapshot() });
 });
 
 app.post("/api/moderator/reject/:id", authMiddleware, (req, res) => {

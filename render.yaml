@@ -12,3 +12,9 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: MODERATOR_USERNAME
+        value: moderator
+      - key: MODERATOR_PASSWORD
+        value: zvOe0NUP86Y4uu90wbr5hyqV
+      - key: PUBLIC_DISPLAY_MS
+        value: "20000"

@@ -378,6 +378,31 @@
         </div>
 
         <div class="card">
+          <div class="section-title">Settings</div>
+          <p class="sub" style="margin-bottom: 12px; font-size: 13px">
+            How long approved public messages stay on the board. Default is 20 seconds.
+            Moderator “Post now” uses the display time field below unless you change it.
+          </p>
+          <div class="field-row">
+            <div class="field">
+              <label for="setting-display-seconds">Message display time (seconds)</label>
+              <input
+                id="setting-display-seconds"
+                type="number"
+                min="1"
+                max="86400"
+                value="20"
+              />
+            </div>
+            <button class="btn-primary" id="save-settings-btn" type="button" style="width: auto; margin-bottom: 0">
+              Save
+            </button>
+          </div>
+          <div class="error" id="settings-error"></div>
+          <div class="error" id="settings-ok" style="color: #22c55e"></div>
+        </div>
+
+        <div class="card">
           <div class="section-title">Post to board</div>
 
           <div class="mini-board">
@@ -457,6 +482,7 @@
 
       let ws = null;
       let reconnectTimer = null;
+      let publicDisplaySeconds = 20;
       let currentNowPlayingId = null;
 
       const loginScreen = document.getElementById("login-screen");
@@ -721,8 +747,34 @@
           })
           .join("");
       }
+      function applySettings(settings) {
+        if (!settings) return;
+        const sec =
+          settings.publicDisplaySeconds != null
+            ? Number(settings.publicDisplaySeconds)
+            : settings.publicDisplayMs != null
+              ? Math.round(Number(settings.publicDisplayMs) / 1000)
+              : null;
+        if (!Number.isFinite(sec) || sec < 1) return;
+        publicDisplaySeconds = sec;
+        const settingInput = document.getElementById("setting-display-seconds");
+        if (settingInput && document.activeElement !== settingInput) {
+          settingInput.value = String(sec);
+        }
+        // Keep per-post duration field in sync when user hasn't customized it mid-edit
+        const durationInput = document.getElementById("mod-duration");
+        const indefiniteInput = document.getElementById("mod-indefinite");
+        if (
+          durationInput &&
+          document.activeElement !== durationInput &&
+          !indefiniteInput?.checked
+        ) {
+          durationInput.value = String(sec);
+        }
+      }
       function applyQueueState(data) {
         localQueue = { ...localQueue, ...data };
+        if (data.settings) applySettings(data.settings);
         updateStatus(localQueue);
         renderQueue(localQueue.pending || []);
         renderDisplayQueue(localQueue.displayItems || []);
@@ -963,6 +1015,8 @@
       const modDuration = document.getElementById("mod-duration");
       const modIndefinite = document.getElementById("mod-indefinite");
       const postError = document.getElementById("post-error");
+      const settingsError = document.getElementById("settings-error");
+      const settingsOk = document.getElementById("settings-ok");
 
       function syncDurationField() {
         modDuration.disabled = modIndefinite.checked;
@@ -974,6 +1028,33 @@
       modMessage.addEventListener("focus", updateMiniBoard);
       document.getElementById("mod-autocenter").addEventListener("change", updateMiniBoard);
       renderColorBlocks();
+
+      document.getElementById("save-settings-btn").addEventListener("click", async () => {
+        settingsError.textContent = "";
+        settingsOk.textContent = "";
+        const sec = Number.parseInt(
+          document.getElementById("setting-display-seconds").value,
+          10,
+        );
+        if (!Number.isFinite(sec) || sec < 1 || sec > 86400) {
+          settingsError.textContent =
+            "Enter a display time between 1 and 86400 seconds.";
+          return;
+        }
+        try {
+          const { res, data } = await api("/api/moderator/settings", {
+            method: "PUT",
+            body: JSON.stringify({ publicDisplaySeconds: sec }),
+          });
+          if (!res.ok || !data.ok) {
+            throw new Error(data.error || "Could not save settings");
+          }
+          applySettings(data);
+          settingsOk.textContent = `Saved. Approved messages show for ${publicDisplaySeconds}s.`;
+        } catch (err) {
+          settingsError.textContent = err.message || "Could not save settings";
+        }
+      });
 
       async function refreshQueue() {
         if (ws?.readyState === 1) {
@@ -998,16 +1079,16 @@
           return;
         }
         const indefinite = modIndefinite.checked;
-        const durationMs = indefinite
-          ? 0
-          : (Number.parseInt(modDuration.value, 10) || 20) * 1000;
+        const durationSec =
+          Number.parseInt(modDuration.value, 10) || publicDisplaySeconds || 20;
+        const durationMs = indefinite ? 0 : durationSec * 1000;
         const body = {
           text,
           indefinite,
           autocenter: document.getElementById("mod-autocenter").checked,
         };
         if (!indefinite) {
-          body.durationSeconds = Number.parseInt(modDuration.value, 10) || 20;
+          body.durationSeconds = durationSec;
         }
         modMessage.value = "";
         updateMiniBoard();
