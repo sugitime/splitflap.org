@@ -4,3 +4,4 @@ deploy-output.log
 docker-deploy-output.log
 docker-compose-err.txt
 docker-compose-out.txt
+.env

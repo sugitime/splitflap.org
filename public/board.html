@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=6912,height=1200,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"
+      content="width=8112,height=1200,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"
     />
     <title>Split Flap Board</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -52,7 +52,7 @@
       }
       html,
       body {
-        width: var(--canvas-w, 6912px);
+        width: var(--canvas-w, 8112px);
         height: var(--canvas-h, 1200px);
         margin: 0;
         padding: 0;
@@ -64,7 +64,7 @@
       #stage {
         display: flex;
         flex-direction: row;
-        width: var(--canvas-w, 6912px);
+        width: var(--canvas-w, 8112px);
         height: var(--canvas-h, 1200px);
         overflow: hidden;
       }
@@ -83,6 +83,21 @@
         align-items: center;
         justify-content: flex-start;
       }
+      #right-logo-panel {
+        position: relative;
+        flex: 0 0 var(--right-panel-w, 1200px);
+        width: var(--right-panel-w, 1200px);
+        height: var(--canvas-h, 1200px);
+        background: #000;
+        border-left: 1px solid rgba(255, 255, 255, 0.08);
+        pointer-events: none;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+      }
       .panel-logo-full {
         display: block;
         width: auto;
@@ -91,6 +106,16 @@
         max-height: var(--board-grid-h, 1200px);
         object-fit: contain;
         object-position: center top;
+        flex: 0 0 auto;
+      }
+      .panel-logo-right {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        max-height: calc(var(--board-grid-h, 1200px) - 80px);
+        object-fit: contain;
+        object-position: center;
         flex: 0 0 auto;
       }
       #submit-qr-float {
@@ -210,6 +235,9 @@
       </div>
       <div class="board-area" id="board-area">
         <div id="vestaboard-wrapper"></div>
+      </div>
+      <div id="right-logo-panel">
+        <img class="panel-logo-right" src="ZYN_WIC_Logo.png" alt="ZYN When It Clicks" />
       </div>
     </div>
 
@@ -849,8 +877,9 @@
         }
       }
       const CANVAS_H = 1200,
-        LEFT_PANEL_W = 1200;
-      let canvasW = 6912;
+        LEFT_PANEL_W = 1200,
+        RIGHT_PANEL_W = 1200;
+      let canvasW = 8112;
       function computeBoardScale() {
         const pad = S.boardPad * 2;
         const gapH = (S.rows - 1) * S.gridGap;
@@ -869,11 +898,12 @@
       function syncCanvasLayout() {
         const boardH = Math.ceil(computeBoardGridHeight());
         const boardW = Math.ceil(computeBoardGridWidth());
-        canvasW = LEFT_PANEL_W + boardW;
+        canvasW = LEFT_PANEL_W + boardW + RIGHT_PANEL_W;
         const root = document.documentElement;
         root.style.setProperty("--canvas-h", CANVAS_H + "px");
         root.style.setProperty("--canvas-w", canvasW + "px");
         root.style.setProperty("--left-panel-w", LEFT_PANEL_W + "px");
+        root.style.setProperty("--right-panel-w", RIGHT_PANEL_W + "px");
         root.style.setProperty("--board-area-w", boardW + "px");
         root.style.setProperty("--board-grid-h", boardH + "px");
         const viewport = document.querySelector('meta[name="viewport"]');
