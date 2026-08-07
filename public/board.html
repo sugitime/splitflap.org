@@ -128,18 +128,18 @@
         left: 8px;
         bottom: 8px;
         z-index: 2;
-        max-height: 15%;
+        max-height: 20%;
         display: flex;
         flex-direction: column;
         align-items: flex-start;
-        gap: 2px;
-        padding: 4px 6px;
+        gap: 3px;
+        padding: 5px 8px;
         background: rgba(0, 0, 0, 0.82);
-        border-radius: 8px;
+        border-radius: 10px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
       }
       #submit-qr-float .submit-qr-label {
-        font-size: 10px;
+        font-size: 12px;
         line-height: 1;
         color: rgba(255, 255, 255, 0.6);
         letter-spacing: 1px;
@@ -996,12 +996,12 @@
         const container = document.getElementById("submit-qr-container");
         const url = "https://www.obviouslyevil.com/submit.html";
         const floatEl = document.getElementById("submit-qr-float");
-        const maxH = CANVAS_H * 0.15;
-        const labelH = 12;
-        const chrome = 14;
+        const maxH = CANVAS_H * 0.195;
+        const labelH = 15;
+        const chrome = 18;
         const size = Math.max(
-          72,
-          Math.min(maxH - labelH - chrome, 160),
+          94,
+          Math.min(maxH - labelH - chrome, 208),
         );
         floatEl.style.maxHeight = maxH + "px";
         drawQR(container, url, size, true);
