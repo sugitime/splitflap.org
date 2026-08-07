@@ -117,6 +117,10 @@
         object-fit: contain;
         object-position: center;
         flex: 0 0 auto;
+        background: transparent;
+        /* Preserve PNG alpha cleanly on black */
+        mix-blend-mode: normal;
+        image-rendering: auto;
       }
       #submit-qr-float {
         position: absolute;
