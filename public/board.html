@@ -110,8 +110,9 @@
       }
       .panel-logo-right {
         display: block;
-        width: 100%;
-        max-width: 100%;
+        width: auto;
+        /* Keep logo mark ~same on-screen size after side crop (was ~47% of full 1200px asset) */
+        max-width: 48%;
         height: auto;
         max-height: calc(var(--board-grid-h, 1200px) - 80px);
         object-fit: contain;
