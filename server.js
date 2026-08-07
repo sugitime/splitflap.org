@@ -66,11 +66,19 @@ let publicDisplayMs = parseDisplayMs(
 const AUTH = {
   moderator: {
     username: process.env.MODERATOR_USERNAME || "moderator",
-    // Prefer MODERATOR_PASSWORD env in production. Fallback is intentionally long/random.
+    // Always set MODERATOR_PASSWORD in production. Local fallback is for dev only.
     password:
-      process.env.MODERATOR_PASSWORD || "zvOe0NUP86Y4uu90wbr5hyqV",
+      process.env.MODERATOR_PASSWORD ||
+      (process.env.NODE_ENV === "production"
+        ? ""
+        : "zvOe0NUP86Y4uu90wbr5hyqV"),
   },
 };
+if (process.env.NODE_ENV === "production" && !process.env.MODERATOR_PASSWORD) {
+  console.warn(
+    "WARNING: MODERATOR_PASSWORD is not set. Moderator login will fail until it is configured.",
+  );
+}
 
 function settingsSnapshot() {
   return {
@@ -300,6 +308,7 @@ function onPublicMessageDone(id) {
 app.post("/api/auth/moderator", (req, res) => {
   const { username, password } = req.body || {};
   if (
+    AUTH.moderator.password &&
     username === AUTH.moderator.username &&
     password === AUTH.moderator.password
   ) {

@@ -14,7 +14,8 @@ services:
         value: production
       - key: MODERATOR_USERNAME
         value: moderator
+      # Set in the Render dashboard / API — do not commit production secrets.
       - key: MODERATOR_PASSWORD
-        value: zvOe0NUP86Y4uu90wbr5hyqV
+        sync: false
       - key: PUBLIC_DISPLAY_MS
         value: "20000"

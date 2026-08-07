@@ -7,7 +7,7 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - MODERATOR_USERNAME=${MODERATOR_USERNAME:-moderator}
-      - MODERATOR_PASSWORD=${MODERATOR_PASSWORD:-zvOe0NUP86Y4uu90wbr5hyqV}
+      - MODERATOR_PASSWORD=${MODERATOR_PASSWORD:?set MODERATOR_PASSWORD}
       - PUBLIC_DISPLAY_MS=${PUBLIC_DISPLAY_MS:-20000}
     restart: unless-stopped
     healthcheck:
