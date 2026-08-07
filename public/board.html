@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=8112,height=1200,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"
+      content="width=7632,height=1200,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"
     />
     <title>Split Flap Board</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -52,7 +52,7 @@
       }
       html,
       body {
-        width: var(--canvas-w, 8112px);
+        width: var(--canvas-w, 7632px);
         height: var(--canvas-h, 1200px);
         margin: 0;
         padding: 0;
@@ -64,7 +64,7 @@
       #stage {
         display: flex;
         flex-direction: row;
-        width: var(--canvas-w, 8112px);
+        width: var(--canvas-w, 7632px);
         height: var(--canvas-h, 1200px);
         overflow: hidden;
       }
@@ -85,8 +85,8 @@
       }
       #right-logo-panel {
         position: relative;
-        flex: 0 0 var(--right-panel-w, 1200px);
-        width: var(--right-panel-w, 1200px);
+        flex: 0 0 var(--right-panel-w, 720px);
+        width: var(--right-panel-w, 720px);
         height: var(--canvas-h, 1200px);
         background: #000;
         border-left: 1px solid rgba(255, 255, 255, 0.08);
@@ -96,7 +96,7 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 40px;
+        padding: 24px;
       }
       .panel-logo-full {
         display: block;
@@ -111,10 +111,9 @@
       .panel-logo-right {
         display: block;
         width: auto;
-        /* Keep logo mark ~same on-screen size after side crop (was ~47% of full 1200px asset) */
-        max-width: 48%;
+        max-width: 100%;
         height: auto;
-        max-height: calc(var(--board-grid-h, 1200px) - 80px);
+        max-height: calc(var(--board-grid-h, 1200px) - 48px);
         object-fit: contain;
         object-position: center;
         flex: 0 0 auto;
@@ -883,8 +882,8 @@
       }
       const CANVAS_H = 1200,
         LEFT_PANEL_W = 1200,
-        RIGHT_PANEL_W = 1200;
-      let canvasW = 8112;
+        RIGHT_PANEL_W = 720;
+      let canvasW = 7632;
       function computeBoardScale() {
         const pad = S.boardPad * 2;
         const gapH = (S.rows - 1) * S.gridGap;
