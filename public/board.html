@@ -960,13 +960,11 @@
       }
       const CANVAS_H = 1200,
         TOP_PAD_BASE = 50,
-        // Left: +5px then +100px more (155). Right: +50px then +5px (105).
+        // Left and right halves share the same vertical offset (155px).
         TOP_PAD =
-          BOARD_HALF === "right"
-            ? TOP_PAD_BASE + 50 + 5
-            : BOARD_HALF === "left"
-              ? TOP_PAD_BASE + 5 + 100
-              : TOP_PAD_BASE,
+          BOARD_HALF === "left" || BOARD_HALF === "right"
+            ? TOP_PAD_BASE + 5 + 100
+            : TOP_PAD_BASE,
         // Left board: ~4% then back ~100px → ~42px. Right: flush to left edge.
         LEFT_PAD =
           BOARD_HALF === "left"
