@@ -21,10 +21,19 @@ app.use(express.json({ limit: "16kb" }));
 app.get("/api/health", (_, res) => {
   res.json({
     ok: true,
+    appEnv: process.env.APP_ENV || "production",
     boardOnline: boardsOnline(),
     boardCount: boardWsSet.size,
     pending: submissionQueue.length,
     display: displayQueue.length,
+  });
+});
+
+/** Client config (used by board pages; UAT host also detects via hostname). */
+app.get("/api/config", (_, res) => {
+  res.json({
+    appEnv: process.env.APP_ENV || "production",
+    isUat: (process.env.APP_ENV || "").toLowerCase() === "uat",
   });
 });
 
