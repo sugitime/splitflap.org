@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=7632,height=1400,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"
+      content="width=7652,height=1250,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"
     />
     <title>Split Flap Board</title>
     <script>
@@ -59,11 +59,14 @@
       }
       html,
       body {
-        width: var(--canvas-w, 7632px);
-        height: var(--total-h, 1400px);
+        /* total size includes top/left pads; no right pad so right edge of content is flush */
+        width: var(--total-w, 7652px);
+        height: var(--total-h, 1250px);
         margin: 0;
         padding: 0;
-        padding-top: var(--top-pad, 200px);
+        padding-top: var(--top-pad, 50px);
+        padding-left: var(--left-pad, 20px);
+        padding-right: 0;
         overflow: hidden;
         background: #000;
         font-family: "Inter", sans-serif;
@@ -935,7 +938,8 @@
         }
       }
       const CANVAS_H = 1200,
-        TOP_PAD = 200,
+        TOP_PAD = 50,
+        LEFT_PAD = 20,
         TOTAL_H = CANVAS_H + TOP_PAD,
         LEFT_PANEL_W = 720,
         RIGHT_PANEL_W = 1200;
@@ -993,11 +997,14 @@
           boardW = Math.ceil(computeBoardGridWidth());
           canvasW = leftW + boardW + rightW;
         }
+        const totalW = canvasW + LEFT_PAD;
         const root = document.documentElement;
         root.style.setProperty("--top-pad", TOP_PAD + "px");
+        root.style.setProperty("--left-pad", LEFT_PAD + "px");
         root.style.setProperty("--canvas-h", CANVAS_H + "px");
         root.style.setProperty("--total-h", TOTAL_H + "px");
         root.style.setProperty("--canvas-w", canvasW + "px");
+        root.style.setProperty("--total-w", totalW + "px");
         root.style.setProperty("--left-panel-w", leftW + "px");
         root.style.setProperty("--right-panel-w", rightW + "px");
         root.style.setProperty("--board-area-w", boardW + "px");
@@ -1010,7 +1017,7 @@
         if (viewport) {
           viewport.setAttribute(
             "content",
-            `width=${canvasW},height=${TOTAL_H},initial-scale=1.0,maximum-scale=1.0,user-scalable=no`,
+            `width=${totalW},height=${TOTAL_H},initial-scale=1.0,maximum-scale=1.0,user-scalable=no`,
           );
         }
       }
@@ -1052,15 +1059,16 @@
         });
       }
       function fitViewport() {
+        const totalW = canvasW + LEFT_PAD;
         const scale = Math.min(
-          window.innerWidth / canvasW,
+          window.innerWidth / totalW,
           window.innerHeight / TOTAL_H,
         );
         document.body.style.transform = `scale(${scale})`;
         document.body.style.transformOrigin = "top left";
         document.documentElement.style.overflow = "hidden";
         document.documentElement.style.height = `${TOTAL_H * scale}px`;
-        document.documentElement.style.width = `${canvasW * scale}px`;
+        document.documentElement.style.width = `${totalW * scale}px`;
       }
       window.addEventListener("resize", () => {
         if (S.autoFit) applyAutoFit();
