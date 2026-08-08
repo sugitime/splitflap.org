@@ -81,9 +81,13 @@
         overflow: hidden;
         transform-origin: top left;
       }
-      /* board1 / board2: shrink main stage 3% */
+      /*
+        board1 / board2:
+        - overall shrink 3% (scale 0.97)
+        - width another 3% → scaleX 0.97 * 0.97 = 0.9409
+      */
       body.half-board #stage {
-        transform: scale(0.97);
+        transform: scale(0.9409, 0.97);
       }
 
       #zyn-logo-panel,
