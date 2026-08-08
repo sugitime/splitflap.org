@@ -1,6 +1,9 @@
 # Render Blueprint: https://render.com/docs/blueprint-spec
 # Deploy: connect this repo in the Render dashboard and apply the blueprint,
 # or use "New > Blueprint" and point at this file.
+#
+# Production: splitflap (live boards)
+# UAT:        splitflap-uat (isolated test instance, free plan)
 
 services:
   - type: web
@@ -12,9 +15,29 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: APP_ENV
+        value: production
       - key: MODERATOR_USERNAME
         value: moderator
       # Set in the Render dashboard / API — do not commit production secrets.
+      - key: MODERATOR_PASSWORD
+        sync: false
+      - key: PUBLIC_DISPLAY_MS
+        value: "20000"
+
+  - type: web
+    name: splitflap-uat
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_ENV
+        value: uat
+      - key: MODERATOR_USERNAME
+        value: moderator
       - key: MODERATOR_PASSWORD
         sync: false
       - key: PUBLIC_DISPLAY_MS
