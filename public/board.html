@@ -301,6 +301,40 @@
         contain: layout style paint;
       }
 
+      /* Flat black letter cells — no rocker chrome / ridges / bezels */
+      .bezel,
+      .bezel-highlight,
+      .ridges,
+      .ridge,
+      .rocker-split-overlay {
+        display: none !important;
+      }
+      .vestaboard-grid,
+      .rocker-scale-wrapper,
+      .rocker-switch,
+      .recessed-hole-stroke,
+      .recessed-hole-bg,
+      .rocker-top,
+      .rocker-bot,
+      .rocker-wrapper-top,
+      .rocker-wrapper-bot,
+      .rocker-wrapper-falling,
+      .rocker-falling-front {
+        background: #000 !important;
+        background-color: #000 !important;
+        background-image: none !important;
+        box-shadow: none !important;
+        filter: none !important;
+        border: none !important;
+        border-radius: 0 !important;
+        -webkit-clip-path: none !important;
+        clip-path: none !important;
+      }
+      .vestaboard-grid {
+        gap: 0 !important;
+        padding: 0 !important;
+      }
+
     </style>
     <style id="dynamic-board-css"></style>
   </head>
@@ -382,34 +416,34 @@
         cols: VIEW_COLS,
         rows: 5,
         scale: 0.22,
-        gridGap: 11,
+        gridGap: 0,
         fontFamily: "'Roboto Mono', monospace",
         fontSize: 247,
         fontWeight: 300,
         fontX: 0,
         fontY: -52,
         fontColor: "#ffffff",
-        boardPad: 13,
-        boardShadow: 0.4,
-        boardRadius: 6,
-        boardBg: "#0f0f0f",
+        boardPad: 0,
+        boardShadow: 0,
+        boardRadius: 0,
+        boardBg: "#000000",
         previewBg: "#000000",
         width: 250,
         height: 540,
         split: 194,
-        pinch: 14,
-        pinchHeight: 54,
-        pinchSlope: 7,
-        outerRadius: 30,
-        bezelRadius: 30,
-        radius: 24,
+        pinch: 0,
+        pinchHeight: 0,
+        pinchSlope: 0,
+        outerRadius: 0,
+        bezelRadius: 0,
+        radius: 0,
         shadow: 0,
-        padBezel: 10,
-        padHole: 24,
-        gap: 7,
+        padBezel: 0,
+        padHole: 0,
+        gap: 0,
         highlightInset: 0,
         strokeW: 0,
-        ridgeCount: 7,
+        ridgeCount: 0,
         ridgeHeight: 7,
         ridgeGap: 1,
         ridgeRadius: 20,
@@ -420,16 +454,16 @@
         r2: "#000000",
         r3: "#000000",
         r4: "#000000",
-        c_bg: "#0f0f0f",
+        c_bg: "#000000",
         c_holeStroke: "#000000",
-        c_holeBg: "#040404",
+        c_holeBg: "#000000",
         g_bezel1: "#000000",
         g_bezel2: "#000000",
-        g_top1: "#0f0f0f",
-        g_top2: "#0f0f0f",
-        g_bot1: "#0f0f0f",
-        g_bot2: "#0f0f0f",
-        g_bot3: "#0f0f0f",
+        g_top1: "#000000",
+        g_top2: "#000000",
+        g_bot1: "#000000",
+        g_bot2: "#000000",
+        g_bot3: "#000000",
         autoFit: true,
       };
       let publicDisplayMs = 20000,
