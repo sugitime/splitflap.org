@@ -12,6 +12,14 @@ from typing import List, Sequence
 COLS = 96
 ROWS = 5
 
+# Fixed TouchDesigner / LED-wall output canvas (matches classic board stage width)
+CANVAS_W = 6912
+CANVAS_H = 1200
+# Side panels within that canvas (ZYN left, DC34+QR right — same flip as web)
+PANEL_LEFT_W = 720
+PANEL_RIGHT_W = 1200
+BOARD_W = CANVAS_W - PANEL_LEFT_W - PANEL_RIGHT_W  # 4992
+
 COLOR_BLOCKS = frozenset("🟥🟧🟨🟩🟦🟪⬜")
 # Approximate Extended_Pictographic for emoji detection (best-effort without unicodedata age tables)
 _EMOJI_RE = re.compile(

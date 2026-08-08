@@ -3,6 +3,8 @@
 A second display client that **uses the same message queue** as the web UI (`board.html`).  
 It registers over WebSocket as another board, receives `play_public_message` / `clear_public_message`, layouts text on a **96×5** grid (same rules as the site), and reports `public_message_done` when display time ends.
 
+**Output resolution is fixed at `6912 × 1200`.**
+
 Nothing on the server has to change. The web board and TouchDesigner can run at the same time; both receive the same play events.
 
 ```
@@ -100,13 +102,15 @@ This creates (if missing):
 - `websocket1` — WebSocket DAT  
 - `grid_text` — Text DAT (96×5 lines)  
 - `status` — Text DAT (connection / now playing)  
+- `layout_info` — canvas/panel sizes (6912×1200)  
 - `grid_table` — Table DAT (optional per-cell)  
-- `board_text` — Text TOP (monospace board look)  
-- `zyn_logo` / `dc34_logo` — Movie File In TOPs  
-- `out1` — Null TOP  
+- `board_text` — Text TOP **4992×1200**  
+- `zyn_logo` / `dc34_logo` — Movie File In TOPs (720×1200 / 1200×1200)  
+- `bg`, `composite1`, `out1` — full **6912×1200** stage  
+- `window1` — Window COMP **6912×1200**  
 - `ws_callbacks` — sample callback code  
 
-And custom parameters: **Host**, **Use TLS**, **Client Name**, **Cols**, **Rows**, **Active**.
+Custom parameters include **Canvas Width/Height** (default 6912×1200), panel widths, **Host**, **Active**, **Apply Resolution**.
 
 ### 3. Wire WebSocket callbacks
 
@@ -139,29 +143,42 @@ op('splitflap_board').ext.SplitflapBoardExt.Connect()
 3. Watch `status` DAT → should show `registered`.
 4. Approve/post a message in the web moderator → `grid_text` / `board_text` update.
 
-### 5. Layout like the web UI (suggested)
+### 5. Resolution & layout — **6912 × 1200**
 
-Match the web stage: **ZYN (left) | board (center) | DC34 + QR (right)**.
+The TD stage is locked to the classic board pixel size:
+
+| Region | Width | Height | Operator |
+|--------|------:|-------:|----------|
+| **Full canvas** | **6912** | **1200** | `out1`, `window1`, `composite1`, `bg` |
+| ZYN (left) | 720 | 1200 | `zyn_logo` |
+| Board (center) | 4992 | 1200 | `board_text` |
+| DC34 (right) | 1200 | 1200 | `dc34_logo` |
+
+`720 + 4992 + 1200 = 6912`.
+
+After `BuildNetwork()`, resolution is applied automatically. To re-apply:
+
+```python
+op('splitflap_board').ext.SplitflapBoardExt.ApplyResolution()
+```
+
+Or pulse the **Apply Resolution** custom parameter.
+
+Layout:
 
 ```
-[zyn_logo]  [board_text]  [dc34_logo]
-                 │
-               out1  →  Window COMP / perform mode
+[ zyn_logo 720 ] [ board_text 4992 ] [ dc34_logo 1200 ]   →  6912 × 1200
+                         │
+                       out1  →  window1 (perform)
 ```
-
-Suggested proportions (same idea as the web canvas):
-
-| Region | Relative width |
-|--------|----------------|
-| ZYN panel | ~9% (was 720 of ~7600) |
-| Board | ~75% |
-| DC34 panel | ~16% (was 1200) |
 
 Tips:
 
-- **board_text**: black background, light gray/white monospace, no word wrap, high resolution (e.g. 3840×400 or full perform size).
-- **zyn_logo** / **dc34_logo**: `Fit` = fit outside/inside, pre-multiplied if needed; use files under `touchdesigner/assets/`.
-- QR code is **not** generated in TD (web board still shows it). To mirror QR, either screenshot, or open the same submit URL as a QR TOP if you have a generator.
+- **board_text**: black background, light gray/white monospace, no word wrap; resolution **4992×1200**.
+- **zyn_logo** / **dc34_logo**: Fit inside; files under `touchdesigner/assets/`.
+- **window1**: set to 6912×1200 (done by `ApplyResolution`).
+- QR is still on the web board; TD does not generate it by default.
+- Web Render TOP (optional exact CSS look): set the TOP resolution to **6912×1200** as well.
 
 ### 6. Optional: pixel-perfect web UI inside TD
 

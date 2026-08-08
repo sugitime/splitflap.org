@@ -4,6 +4,11 @@
   "clientName": "touchdesigner",
   "cols": 96,
   "rows": 5,
+  "canvasWidth": 6912,
+  "canvasHeight": 1200,
+  "panelLeftWidth": 720,
+  "panelRightWidth": 1200,
+  "boardWidth": 4992,
   "defaultDisplayMs": 20000,
-  "notes": "Copy to config.json and point the TD Host parameter at the same host as the web board."
+  "notes": "Output resolution is fixed at 6912x1200. Copy to config.json and point the TD Host parameter at the same host as the web board."
 }

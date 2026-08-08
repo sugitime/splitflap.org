@@ -79,6 +79,21 @@ class SplitflapBoardExt:
     def _rows(self) -> int:
         return int(self._par("Rows", 5) or 5)
 
+    def _canvas_w(self) -> int:
+        return int(self._par("Canvasw", layout.CANVAS_W) or layout.CANVAS_W)
+
+    def _canvas_h(self) -> int:
+        return int(self._par("Canvash", layout.CANVAS_H) or layout.CANVAS_H)
+
+    def _panel_left_w(self) -> int:
+        return int(self._par("Panelleftw", layout.PANEL_LEFT_W) or layout.PANEL_LEFT_W)
+
+    def _panel_right_w(self) -> int:
+        return int(self._par("Panelrightw", layout.PANEL_RIGHT_W) or layout.PANEL_RIGHT_W)
+
+    def _board_w(self) -> int:
+        return max(1, self._canvas_w() - self._panel_left_w() - self._panel_right_w())
+
     # ── client ───────────────────────────────────────────────────────
 
     def _ensure_client(self):
@@ -229,6 +244,76 @@ class SplitflapBoardExt:
         if self.client:
             self.client._clear(None, urgent=True)
 
+    def ApplyResolution(self):
+        """
+        Force all display TOPs to the 6912×1200 stage layout:
+          [ ZYN 720 | board 4992 | DC34 1200 ] × 1200
+        """
+        root = self.ownerComp
+        cw, ch = self._canvas_w(), self._canvas_h()
+        lw, rw, bw = self._panel_left_w(), self._panel_right_w(), self._board_w()
+
+        def set_res(op_name, w, h):
+            o = root.op(op_name)
+            if o is None:
+                return
+            for pair in (("resolutionw", w), ("resolutionh", h), ("w", w), ("h", h)):
+                name, val = pair
+                if hasattr(o.par, name):
+                    try:
+                        getattr(o.par, name).val = val
+                    except Exception:
+                        pass
+            # Common TD TOP resolution mode: use custom resolution
+            if hasattr(o.par, "resolution"):
+                try:
+                    # 1 = Custom resolution on many builds
+                    o.par.resolution = 1
+                except Exception:
+                    pass
+
+        set_res("zyn_logo", lw, ch)
+        set_res("board_text", bw, ch)
+        set_res("dc34_logo", rw, ch)
+        set_res("out1", cw, ch)
+        set_res("composite1", cw, ch)
+        set_res("bg", cw, ch)
+
+        # Optional Window COMP for perform
+        win = root.op("window1")
+        if win is not None:
+            for name, val in (
+                ("winw", cw),
+                ("winh", ch),
+                ("winoffsetx", 0),
+                ("winoffsety", 0),
+            ):
+                if hasattr(win.par, name):
+                    try:
+                        getattr(win.par, name).val = val
+                    except Exception:
+                        pass
+
+        # Write layout constants into a DAT for expressions
+        lay = root.op("layout_info")
+        if lay is not None:
+            lay.text = "\n".join(
+                [
+                    f"canvas_w\t{cw}",
+                    f"canvas_h\t{ch}",
+                    f"panel_left_w\t{lw}",
+                    f"board_w\t{bw}",
+                    f"panel_right_w\t{rw}",
+                    f"cols\t{self._cols()}",
+                    f"rows\t{self._rows()}",
+                ]
+            )
+
+        debug(
+            f"[splitflap] resolution {cw}x{ch} "
+            f"(left={lw}, board={bw}, right={rw})"
+        )
+
     # ── one-shot network builder ─────────────────────────────────────
 
     def BuildNetwork(self):
@@ -271,21 +356,44 @@ class SplitflapBoardExt:
                 root.par.Cols = 96
                 page.appendInt("Rows", label="Rows")
                 root.par.Rows = 5
+                page.appendInt("Canvasw", label="Canvas Width")
+                root.par.Canvasw = layout.CANVAS_W  # 6912
+                page.appendInt("Canvash", label="Canvas Height")
+                root.par.Canvash = layout.CANVAS_H  # 1200
+                page.appendInt("Panelleftw", label="Left Panel Width (ZYN)")
+                root.par.Panelleftw = layout.PANEL_LEFT_W  # 720
+                page.appendInt("Panelrightw", label="Right Panel Width (DC34)")
+                root.par.Panelrightw = layout.PANEL_RIGHT_W  # 1200
                 page.appendToggle("Active", label="Active")
                 root.par.Active = False
                 page.appendPulse("Connect", label="Connect")
                 page.appendPulse("Disconnect", label="Disconnect")
+                page.appendPulse("Applyres", label="Apply Resolution")
         except Exception as e:
             debug(f"[splitflap] custom pars: {e}")
+        else:
+            # Keep resolution pars correct if COMP already existed
+            if hasattr(root.par, "Canvasw"):
+                root.par.Canvasw = layout.CANVAS_W
+            if hasattr(root.par, "Canvash"):
+                root.par.Canvash = layout.CANVAS_H
+            if hasattr(root.par, "Panelleftw"):
+                root.par.Panelleftw = layout.PANEL_LEFT_W
+            if hasattr(root.par, "Panelrightw"):
+                root.par.Panelrightw = layout.PANEL_RIGHT_W
 
         ensure("websocketDAT", "websocket1")
         ensure("textDAT", "grid_text")
         ensure("textDAT", "status")
+        ensure("textDAT", "layout_info")
         ensure("tableDAT", "grid_table")
         ensure("textTOP", "board_text")
         ensure("moviefileinTOP", "zyn_logo")
         ensure("moviefileinTOP", "dc34_logo")
+        ensure("constantTOP", "bg")
+        ensure("compositeTOP", "composite1")
         ensure("nullTOP", "out1")
+        ensure("windowCOMP", "window1")
 
         # Point logos at assets if present
         assets = os.path.abspath(os.path.join(_THIS_DIR, "..", "assets"))
@@ -325,6 +433,20 @@ class SplitflapBoardExt:
             except Exception as e:
                 debug(f"[splitflap] board_text wire: {e}")
 
+        # Black stage background
+        bg = root.op("bg")
+        if bg is not None:
+            try:
+                if hasattr(bg.par, "colorr"):
+                    bg.par.colorr = 0
+                    bg.par.colorg = 0
+                    bg.par.colorb = 0
+            except Exception:
+                pass
+
+        # Apply fixed 6912×1200 geometry to all TOPs / window
+        self.ApplyResolution()
+
         # WebSocket callbacks script
         cb = ensure("textDAT", "ws_callbacks")
         if cb is not None:
@@ -344,8 +466,12 @@ def onError(dat, errorCode, errorMsg):
 '''
             debug("[splitflap] wrote ws_callbacks — copy into websocket1 Callbacks page")
 
-        # Parameter execute for Active / Connect / Disconnect
+        # Parameter execute for Active / Connect / Disconnect / Applyres
         ensure("parexecDAT", "par_exec")
 
-        debug("[splitflap] BuildNetwork complete. Set Host, enable Active, copy ws_callbacks into websocket1.")
+        debug(
+            "[splitflap] BuildNetwork complete @ 6912x1200. "
+            "Set Host, enable Active, copy ws_callbacks into websocket1. "
+            "Composite: zyn_logo | board_text | dc34_logo → out1."
+        )
         return True
