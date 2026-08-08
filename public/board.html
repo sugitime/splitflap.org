@@ -79,6 +79,11 @@
         width: var(--canvas-w, 7632px);
         height: var(--canvas-h, 1200px);
         overflow: hidden;
+        transform-origin: top left;
+      }
+      /* board1 / board2: shrink main stage 3% */
+      body.half-board #stage {
+        transform: scale(0.97);
       }
 
       #zyn-logo-panel,
@@ -1038,6 +1043,10 @@
         if (qr) {
           qr.style.display = BOARD_HALF === "left" ? "none" : "";
         }
+        document.body.classList.toggle(
+          "half-board",
+          BOARD_HALF === "left" || BOARD_HALF === "right",
+        );
         document.title =
           BOARD_HALF === "left"
             ? "Split Flap Board — Left (1) 3552×1200"
