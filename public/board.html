@@ -974,14 +974,10 @@
         }
       }
       const CANVAS_H = 1200,
-        // Shared base top pad; left body gets +6px total (+3 twice).
+        // Identical top pad on both halves so board rows line up across screens.
         HALF_TOP_PAD = 155,
         TOP_PAD =
-          BOARD_HALF === "left"
-            ? HALF_TOP_PAD + 6
-            : BOARD_HALF === "right"
-              ? HALF_TOP_PAD
-              : 50,
+          BOARD_HALF === "left" || BOARD_HALF === "right" ? HALF_TOP_PAD : 50,
         // Both halves: no side body pad (left pins right via fitViewport).
         LEFT_PAD =
           BOARD_HALF === "left" || BOARD_HALF === "right" ? 0 : 20,
@@ -1006,16 +1002,32 @@
         if (BOARD_HALF === "right") return BOARD2_CANVAS_W - RIGHT_PANEL_W; // 2160
         return null;
       }
+      /**
+       * Shared flap scale for board1 + board2 so the vestaboard is the same height
+       * on both screens. Uses the tighter of height-fit and either half's width-fit.
+       */
+      function computeSharedHalfScale() {
+        const pad = S.boardPad * 2;
+        const gapH = (S.rows - 1) * S.gridGap;
+        const scaleH = (CANVAS_H - pad - gapH) / (S.rows * S.height);
+        const leftArea = BOARD1_CANVAS_W - LEFT_PANEL_W;
+        const rightArea = BOARD2_CANVAS_W - RIGHT_PANEL_W;
+        const gapWLeft = Math.max(0, LEFT_VIEW_COLS - 1) * S.gridGap;
+        const gapWRight = Math.max(0, RIGHT_VIEW_COLS - 1) * S.gridGap;
+        const scaleWLeft =
+          (leftArea - pad - gapWLeft) / (LEFT_VIEW_COLS * S.width);
+        const scaleWRight =
+          (rightArea - pad - gapWRight) / (RIGHT_VIEW_COLS * S.width);
+        return Math.min(scaleH, scaleWLeft, scaleWRight);
+      }
       function computeBoardScale() {
         const pad = S.boardPad * 2;
         const gapH = (S.rows - 1) * S.gridGap;
         const scaleH = (CANVAS_H - pad - gapH) / (S.rows * S.height);
-        const targetW = targetBoardAreaW();
-        if (targetW == null) return scaleH;
-        const gapW = Math.max(0, S.cols - 1) * S.gridGap;
-        const scaleW = (targetW - pad - gapW) / (S.cols * S.width);
-        // Prefer filling the assigned board width on split screens
-        return Math.min(scaleH, scaleW);
+        if (BOARD_HALF === "left" || BOARD_HALF === "right") {
+          return computeSharedHalfScale();
+        }
+        return scaleH;
       }
       function computeBoardGridHeight() {
         const pad = S.boardPad * 2;
