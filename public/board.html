@@ -76,76 +76,79 @@
         overflow: hidden;
       }
 
-      #zyn-logo-panel {
-        position: relative;
-        flex: 0 0 var(--left-panel-w, 720px);
-        width: var(--left-panel-w, 720px);
-        height: var(--canvas-h, 1200px);
-        background: #000;
-        border-right: 1px solid rgba(255, 255, 255, 0.08);
-        pointer-events: none;
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        padding: 24px;
-      }
+      #zyn-logo-panel,
       #submit-qr-panel {
         position: relative;
-        flex: 0 0 var(--right-panel-w, 1200px);
-        width: var(--right-panel-w, 1200px);
         height: var(--canvas-h, 1200px);
         background: #000;
-        border-left: 1px solid rgba(255, 255, 255, 0.08);
         pointer-events: none;
         overflow: hidden;
         display: flex;
         flex-direction: column;
+        /* Top-align with vestaboard (board-area is flex-start) */
         align-items: center;
         justify-content: flex-start;
+        padding: 0;
       }
-      .panel-logo-full {
-        display: block;
-        width: auto;
-        max-width: 100%;
+      #zyn-logo-panel {
+        flex: 0 0 var(--left-panel-w, 720px);
+        width: var(--left-panel-w, 720px);
+        border-right: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      #submit-qr-panel {
+        flex: 0 0 var(--right-panel-w, 1200px);
+        width: var(--right-panel-w, 1200px);
+        border-left: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      /* Logo box is exactly vestaboard height — never taller than the board */
+      .panel-logo-stack {
+        position: relative;
+        width: 100%;
         height: var(--board-grid-h, 1200px);
         max-height: var(--board-grid-h, 1200px);
-        object-fit: contain;
-        object-position: center top;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
         flex: 0 0 auto;
+        box-sizing: border-box;
+        padding: 0 16px;
       }
+      .panel-logo-full,
       .panel-logo-zyn {
         display: block;
         width: auto;
-        max-width: 100%;
         height: auto;
-        max-height: calc(var(--board-grid-h, 1200px) - 48px);
+        max-width: 100%;
+        max-height: 100%;
         object-fit: contain;
-        object-position: center;
+        object-position: center center;
         flex: 0 0 auto;
         background: transparent;
-        /* Preserve PNG alpha cleanly on black */
         mix-blend-mode: normal;
         image-rendering: auto;
       }
+      /* QR sits on the logo stack, bottom edge of vestaboard — not canvas bottom */
       #submit-qr-float {
         position: absolute;
-        left: 8px;
-        bottom: 8px;
+        left: 50%;
+        bottom: 12px;
+        transform: translateX(-50%);
         z-index: 2;
-        max-height: 20%;
+        max-width: calc(100% - 24px);
+        max-height: 28%;
         display: flex;
         flex-direction: column;
-        align-items: flex-start;
-        gap: 3px;
-        padding: 5px 8px;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 8px;
         background: rgba(0, 0, 0, 0.82);
         border-radius: 10px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+        box-sizing: border-box;
       }
       #submit-qr-float .submit-qr-label {
-        font-size: 12px;
+        font-size: 11px;
         line-height: 1;
         color: rgba(255, 255, 255, 0.6);
         letter-spacing: 1px;
@@ -168,6 +171,8 @@
       }
       #submit-qr-container canvas {
         display: block;
+        max-width: 100%;
+        height: auto;
       }
 
       /* Board */
@@ -238,16 +243,20 @@
   <body>
     <div id="stage">
       <div id="zyn-logo-panel">
-        <img class="panel-logo-zyn" src="ZYN_WIC_Logo.png" alt="ZYN When It Clicks" />
+        <div class="panel-logo-stack">
+          <img class="panel-logo-zyn" src="ZYN_WIC_Logo.png" alt="ZYN When It Clicks" />
+        </div>
       </div>
       <div class="board-area" id="board-area">
         <div id="vestaboard-wrapper"></div>
       </div>
       <div id="submit-qr-panel">
-        <img class="panel-logo-full" src="dc-34-logo.avif" alt="DEF CON 34" />
-        <div id="submit-qr-float">
-          <div class="submit-qr-label">Submit a message</div>
-          <div id="submit-qr-container"></div>
+        <div class="panel-logo-stack">
+          <img class="panel-logo-full" src="dc-34-logo.avif" alt="DEF CON 34" />
+          <div id="submit-qr-float">
+            <div class="submit-qr-label">Submit a message</div>
+            <div id="submit-qr-container"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -1020,7 +1029,10 @@
           dynamicCSS.textContent = buildDynamicCSS();
         }
         syncCanvasLayout();
-        requestAnimationFrame(fitViewport);
+        requestAnimationFrame(() => {
+          fitViewport();
+          generateSubmitQR();
+        });
       }
       function fitViewport() {
         const scale = Math.min(
@@ -1079,17 +1091,38 @@
 
       function generateSubmitQR() {
         const container = document.getElementById("submit-qr-container");
-        const url = "https://www.obviouslyevil.com/submit.html";
         const floatEl = document.getElementById("submit-qr-float");
-        const maxH = CANVAS_H * 0.195;
-        const labelH = 15;
-        const chrome = 18;
+        if (!container || !floatEl) return;
+        // Hide QR on left-only half (panel not shown)
+        if (BOARD_HALF === "left") {
+          floatEl.style.display = "none";
+          return;
+        }
+        floatEl.style.display = "";
+        const url = "https://www.obviouslyevil.com/submit.html";
+        // Size against vestaboard height, not full canvas (logos stop at board bottom)
+        const boardH =
+          parseFloat(
+            getComputedStyle(document.documentElement).getPropertyValue(
+              "--board-grid-h",
+            ),
+          ) || CANVAS_H;
+        const panelW =
+          parseFloat(
+            getComputedStyle(document.documentElement).getPropertyValue(
+              "--right-panel-w",
+            ),
+          ) || RIGHT_PANEL_W;
+        const maxH = boardH * 0.22;
+        const maxW = Math.max(80, panelW * 0.42);
+        const labelH = 14;
+        const chrome = 16;
         const size = Math.max(
-          94,
-          Math.min(maxH - labelH - chrome, 208),
+          72,
+          Math.min(maxH - labelH - chrome, maxW, 200),
         );
-        floatEl.style.maxHeight = maxH + "px";
-        drawQR(container, url, size, true);
+        floatEl.style.maxHeight = Math.round(maxH) + "px";
+        drawQR(container, url, Math.round(size), true);
       }
 
       function clearPublicQueueTimer() {
