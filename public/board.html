@@ -89,6 +89,18 @@
       body.half-board #stage {
         transform: scale(0.9409, 0.97);
       }
+      /* Left screen: pin entire stage to the right edge */
+      body.half-left {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        margin-left: auto;
+        margin-right: 0;
+      }
+      body.half-left #stage {
+        transform-origin: top right;
+        margin-left: auto;
+        margin-right: 0;
+      }
 
       #zyn-logo-panel,
       #submit-qr-panel {
@@ -965,13 +977,9 @@
           BOARD_HALF === "left" || BOARD_HALF === "right"
             ? TOP_PAD_BASE + 5 + 100
             : TOP_PAD_BASE,
-        // Left board: ~4% then back ~100px → ~42px. Right: flush to left edge.
+        // Left board: flush right (no left inset). Right: flush left.
         LEFT_PAD =
-          BOARD_HALF === "left"
-            ? Math.max(0, Math.round(BOARD1_CANVAS_W * 0.04) - 100)
-            : BOARD_HALF === "right"
-              ? 0
-              : 20,
+          BOARD_HALF === "left" || BOARD_HALF === "right" ? 0 : 20,
         TOTAL_H = CANVAS_H + TOP_PAD,
         LEFT_PANEL_W = 720,
         RIGHT_PANEL_W = 1200;
@@ -1102,8 +1110,25 @@
           window.innerWidth / totalW,
           window.innerHeight / TOTAL_H,
         );
+        // Left half: anchor whole page to the right edge of the left screen
+        if (BOARD_HALF === "left") {
+          document.body.style.position = "absolute";
+          document.body.style.top = "0";
+          document.body.style.right = "0";
+          document.body.style.left = "auto";
+          document.body.style.bottom = "auto";
+          document.body.style.margin = "0";
+          document.body.style.transformOrigin = "top right";
+        } else {
+          document.body.style.position = "";
+          document.body.style.top = "";
+          document.body.style.right = "";
+          document.body.style.left = "";
+          document.body.style.bottom = "";
+          document.body.style.margin = "";
+          document.body.style.transformOrigin = "top left";
+        }
         document.body.style.transform = `scale(${scale})`;
-        document.body.style.transformOrigin = "top left";
         document.documentElement.style.overflow = "hidden";
         document.documentElement.style.height = `${TOTAL_H * scale}px`;
         document.documentElement.style.width = `${totalW * scale}px`;
