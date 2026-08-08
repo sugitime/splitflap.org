@@ -974,12 +974,14 @@
         }
       }
       const CANVAS_H = 1200,
-        // One shared top pad for body + stage on both half screens (must match).
+        // Shared base top pad; left gets +3px.
         HALF_TOP_PAD = 155,
         TOP_PAD =
-          BOARD_HALF === "left" || BOARD_HALF === "right"
-            ? HALF_TOP_PAD
-            : 50,
+          BOARD_HALF === "left"
+            ? HALF_TOP_PAD + 3
+            : BOARD_HALF === "right"
+              ? HALF_TOP_PAD
+              : 50,
         // Both halves: no side body pad (left pins right via fitViewport).
         LEFT_PAD =
           BOARD_HALF === "left" || BOARD_HALF === "right" ? 0 : 20,
