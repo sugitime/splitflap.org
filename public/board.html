@@ -86,17 +86,23 @@
         - overall shrink 3% (scale 0.97)
         - width another 3% → scaleX 0.97 * 0.97 = 0.9409
       */
-      /* Same scale + origin on both halves so vertical alignment matches */
+      /* Same scale on both halves; origin differs so left can pin flush right */
       body.half-board #stage {
         transform: scale(0.9409, 0.97);
         transform-origin: top left;
       }
-      /* Left screen: flush pads; horizontal pin handled in fitViewport */
       body.half-left,
       body.half-right {
         padding-left: 0 !important;
         padding-right: 0 !important;
         margin: 0 !important;
+      }
+      /* Left board: shrink toward the right edge → 0px gap on the right */
+      body.half-left #stage {
+        transform-origin: top right;
+        margin-left: auto;
+        margin-right: 0;
+        float: right;
       }
 
       #zyn-logo-panel,
@@ -1110,43 +1116,42 @@
         );
         // Force identical top padding on body for both halves
         document.body.style.paddingTop = TOP_PAD + "px";
-        document.body.style.paddingLeft = LEFT_PAD + "px";
+        document.body.style.paddingLeft = "0";
         document.body.style.paddingRight = "0";
         document.body.style.paddingBottom = "0";
         document.body.style.margin = "0";
         document.body.style.boxSizing = "border-box";
-        // Always scale from top-left so Y alignment matches left/right
-        document.body.style.transformOrigin = "top left";
+        document.body.style.width = totalW + "px";
+        document.body.style.height = TOTAL_H + "px";
         document.body.style.position = "absolute";
         document.body.style.top = "0";
         document.body.style.bottom = "auto";
 
         if (BOARD_HALF === "left") {
-          // Pin whole layout to the right of the left screen (X only)
-          document.body.style.left = "0";
-          document.body.style.right = "auto";
-          const scaledW = totalW * scale;
-          const offsetX = Math.max(0, window.innerWidth - scaledW);
-          document.body.style.transform = `translate(${offsetX}px, 0) scale(${scale})`;
+          // Pin body to browser right edge — 0px gap
+          document.body.style.left = "auto";
+          document.body.style.right = "0";
+          document.body.style.transformOrigin = "top right";
+          document.body.style.transform = `scale(${scale})`;
         } else if (BOARD_HALF === "right") {
-          // Flush left of the right screen
           document.body.style.left = "0";
           document.body.style.right = "auto";
+          document.body.style.transformOrigin = "top left";
           document.body.style.transform = `scale(${scale})`;
         } else {
           document.body.style.position = "";
           document.body.style.left = "";
           document.body.style.right = "";
           document.body.style.top = "";
+          document.body.style.width = "";
+          document.body.style.height = "";
+          document.body.style.transformOrigin = "top left";
           document.body.style.transform = `scale(${scale})`;
         }
 
         document.documentElement.style.overflow = "hidden";
         document.documentElement.style.height = `${TOTAL_H * scale}px`;
-        document.documentElement.style.width =
-          BOARD_HALF === "left"
-            ? `${window.innerWidth}px`
-            : `${totalW * scale}px`;
+        document.documentElement.style.width = `${window.innerWidth}px`;
       }
       window.addEventListener("resize", () => {
         if (S.autoFit) applyAutoFit();
