@@ -955,9 +955,12 @@
             : BOARD_HALF === "left"
               ? TOP_PAD_BASE + 5
               : TOP_PAD_BASE,
-        // Left board: ~4% of canvas width as left margin. Right keeps 20px.
+        // Left board: ~4% of canvas (~142px) then shift back ~100px → ~42px.
+        // Right keeps 20px.
         LEFT_PAD =
-          BOARD_HALF === "left" ? Math.round(BOARD1_CANVAS_W * 0.04) : 20,
+          BOARD_HALF === "left"
+            ? Math.max(0, Math.round(BOARD1_CANVAS_W * 0.04) - 100)
+            : 20,
         TOTAL_H = CANVAS_H + TOP_PAD,
         LEFT_PANEL_W = 720,
         RIGHT_PANEL_W = 1200;
