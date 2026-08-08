@@ -88,10 +88,30 @@
         padding-right: 0 !important;
         margin: 0 !important;
       }
-      /* Left board: pin stage to the right edge */
+      /*
+        Left board (board1): content flush to the RIGHT of the viewport.
+        position:fixed + right:0 → 0px gap at the screen's right edge.
+      */
+      html.half-left,
+      body.half-left {
+        width: 100% !important;
+        max-width: none !important;
+      }
+      body.half-left {
+        position: fixed !important;
+        top: 0 !important;
+        right: 0 !important;
+        left: auto !important;
+        bottom: auto !important;
+      }
       body.half-left #stage {
         margin-left: auto;
         margin-right: 0;
+        float: right;
+      }
+      /* Shared scale can leave spare width — keep flaps flush to stage right */
+      body.half-left .board-area {
+        justify-content: flex-end;
       }
 
       #zyn-logo-panel,
@@ -1124,36 +1144,48 @@
         document.body.style.paddingBottom = "0";
         document.body.style.margin = "0";
         document.body.style.boxSizing = "border-box";
-        document.body.style.width = totalW + "px";
         document.body.style.height = TOTAL_H + "px";
         document.body.style.transform = "none";
         document.body.style.transformOrigin = "";
 
-        if (BOARD_HALF === "left") {
-          // Pin fixed-size body to browser right edge
-          document.body.style.position = "absolute";
-          document.body.style.top = "0";
-          document.body.style.bottom = "auto";
-          document.body.style.left = "auto";
-          document.body.style.right = "0";
-        } else if (BOARD_HALF === "right") {
-          // Pin fixed-size body to browser left edge
-          document.body.style.position = "absolute";
-          document.body.style.top = "0";
-          document.body.style.bottom = "auto";
-          document.body.style.left = "0";
-          document.body.style.right = "auto";
-        } else {
-          document.body.style.position = "absolute";
-          document.body.style.top = "0";
-          document.body.style.left = "0";
-          document.body.style.right = "auto";
-          document.body.style.bottom = "auto";
-        }
-
+        document.documentElement.classList.toggle(
+          "half-left",
+          BOARD_HALF === "left",
+        );
+        document.documentElement.classList.toggle(
+          "half-right",
+          BOARD_HALF === "right",
+        );
         document.documentElement.style.overflow = "hidden";
-        document.documentElement.style.height = TOTAL_H + "px";
-        document.documentElement.style.width = totalW + "px";
+        document.documentElement.style.height = "100%";
+
+        if (BOARD_HALF === "left") {
+          // Fixed width content, flush to viewport RIGHT — 0px gap
+          document.documentElement.style.width = "100%";
+          document.body.style.position = "fixed";
+          document.body.style.top = "0";
+          document.body.style.right = "0";
+          document.body.style.left = "auto";
+          document.body.style.bottom = "auto";
+          document.body.style.width = totalW + "px";
+        } else if (BOARD_HALF === "right") {
+          // Fixed width content, flush to viewport LEFT — 0px gap
+          document.documentElement.style.width = "100%";
+          document.body.style.position = "fixed";
+          document.body.style.top = "0";
+          document.body.style.left = "0";
+          document.body.style.right = "auto";
+          document.body.style.bottom = "auto";
+          document.body.style.width = totalW + "px";
+        } else {
+          document.documentElement.style.width = totalW + "px";
+          document.body.style.position = "absolute";
+          document.body.style.top = "0";
+          document.body.style.left = "0";
+          document.body.style.right = "auto";
+          document.body.style.bottom = "auto";
+          document.body.style.width = totalW + "px";
+        }
       }
       window.addEventListener("resize", () => {
         // Keep anchors only — size stays fixed (no browser-driven scale)
