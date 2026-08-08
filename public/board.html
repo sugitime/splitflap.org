@@ -939,9 +939,15 @@
       }
       const CANVAS_H = 1200,
         TOP_PAD_BASE = 50,
-        // Right screen sits 50px lower than left (50 + 50)
-        TOP_PAD = BOARD_HALF === "right" ? TOP_PAD_BASE + 50 : TOP_PAD_BASE,
-        LEFT_PAD = 20,
+        // Left: +5px down (55). Right: +50px down vs base (100).
+        TOP_PAD =
+          BOARD_HALF === "right"
+            ? TOP_PAD_BASE + 50
+            : BOARD_HALF === "left"
+              ? TOP_PAD_BASE + 5
+              : TOP_PAD_BASE,
+        // Left screen inset 10px less (moved left 10px). Right keeps 20px.
+        LEFT_PAD = BOARD_HALF === "left" ? 10 : 20,
         TOTAL_H = CANVAS_H + TOP_PAD,
         LEFT_PANEL_W = 720,
         RIGHT_PANEL_W = 1200;
