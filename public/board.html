@@ -100,7 +100,10 @@
         width: var(--right-panel-w, 1200px);
         border-left: 1px solid rgba(255, 255, 255, 0.08);
       }
-      /* Logo box is exactly vestaboard height — never taller than the board */
+      /*
+        Logo stack height = vestaboard height. Logos themselves are capped smaller
+        than the board on both axes so they never read larger than the flaps.
+      */
       .panel-logo-stack {
         position: relative;
         width: 100%;
@@ -112,15 +115,19 @@
         overflow: hidden;
         flex: 0 0 auto;
         box-sizing: border-box;
-        padding: 0 16px;
+        padding: 0 20px;
       }
       .panel-logo-full,
       .panel-logo-zyn {
         display: block;
         width: auto;
         height: auto;
-        max-width: 100%;
-        max-height: 100%;
+        /* Never larger than the board: height & width both ≤ board height */
+        max-width: min(
+          100%,
+          var(--logo-max-size, calc(var(--board-grid-h, 1200px) * 0.72))
+        );
+        max-height: var(--logo-max-size, calc(var(--board-grid-h, 1200px) * 0.72));
         object-fit: contain;
         object-position: center center;
         flex: 0 0 auto;
@@ -989,6 +996,10 @@
         root.style.setProperty("--right-panel-w", rightW + "px");
         root.style.setProperty("--board-area-w", boardW + "px");
         root.style.setProperty("--board-grid-h", boardH + "px");
+        // Logos must not exceed vestaboard size (use the smaller board axis)
+        const boardGridW = Math.ceil(computeBoardGridWidth());
+        const logoMax = Math.floor(Math.min(boardH, boardGridW) * 0.72);
+        root.style.setProperty("--logo-max-size", logoMax + "px");
         const viewport = document.querySelector('meta[name="viewport"]');
         if (viewport) {
           viewport.setAttribute(
