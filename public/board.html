@@ -271,15 +271,30 @@
         return i !== -1 ? i : 0;
       }
 
-      /** full | left | right — left/right each show half of the 96-col board */
+      /** full | left | right — split across two screens (not 50/50) */
       const BOARD_HALF =
         window.BOARD_HALF === "left" || window.BOARD_HALF === "right"
           ? window.BOARD_HALF
           : "full";
+      // Target stage sizes for dual-output (sum = 6912, classic wall width)
+      const BOARD1_CANVAS_W = 3552; // left screen: ZYN + left board segment
+      const BOARD2_CANVAS_W = 3360; // right screen: right board segment + DC34/QR
       const FULL_COLS = 96;
-      const HALF_COLS = 48;
-      const VIEW_COLS = BOARD_HALF === "full" ? FULL_COLS : HALF_COLS;
-      const VIEW_COL_OFFSET = BOARD_HALF === "right" ? HALF_COLS : 0;
+      // Board pixel areas within each canvas (panels fixed below)
+      // left board area  = 3552 - 720 = 2832
+      // right board area = 3360 - 1200 = 2160
+      // col split proportional to board area widths:
+      //   left  = round(96 * 2832 / 4992) = 54
+      //   right = 96 - 54 = 42
+      const LEFT_VIEW_COLS = 54;
+      const RIGHT_VIEW_COLS = 42;
+      const VIEW_COLS =
+        BOARD_HALF === "left"
+          ? LEFT_VIEW_COLS
+          : BOARD_HALF === "right"
+            ? RIGHT_VIEW_COLS
+            : FULL_COLS;
+      const VIEW_COL_OFFSET = BOARD_HALF === "right" ? LEFT_VIEW_COLS : 0;
 
       const S = {
         animDuration: 360,
@@ -904,17 +919,34 @@
       const CANVAS_H = 1200,
         LEFT_PANEL_W = 720,
         RIGHT_PANEL_W = 1200;
-      let canvasW = 7632;
+      let canvasW =
+        BOARD_HALF === "left"
+          ? BOARD1_CANVAS_W
+          : BOARD_HALF === "right"
+            ? BOARD2_CANVAS_W
+            : 7632;
       function panelLeftW() {
         return BOARD_HALF === "right" ? 0 : LEFT_PANEL_W;
       }
       function panelRightW() {
         return BOARD_HALF === "left" ? 0 : RIGHT_PANEL_W;
       }
+      /** Fixed board-area width for split screens; null for full board (derived from scale). */
+      function targetBoardAreaW() {
+        if (BOARD_HALF === "left") return BOARD1_CANVAS_W - LEFT_PANEL_W; // 2832
+        if (BOARD_HALF === "right") return BOARD2_CANVAS_W - RIGHT_PANEL_W; // 2160
+        return null;
+      }
       function computeBoardScale() {
         const pad = S.boardPad * 2;
         const gapH = (S.rows - 1) * S.gridGap;
-        return (CANVAS_H - pad - gapH) / (S.rows * S.height);
+        const scaleH = (CANVAS_H - pad - gapH) / (S.rows * S.height);
+        const targetW = targetBoardAreaW();
+        if (targetW == null) return scaleH;
+        const gapW = Math.max(0, S.cols - 1) * S.gridGap;
+        const scaleW = (targetW - pad - gapW) / (S.cols * S.width);
+        // Prefer filling the assigned board width on split screens
+        return Math.min(scaleH, scaleW);
       }
       function computeBoardGridHeight() {
         const pad = S.boardPad * 2;
@@ -928,10 +960,19 @@
       }
       function syncCanvasLayout() {
         const boardH = Math.ceil(computeBoardGridHeight());
-        const boardW = Math.ceil(computeBoardGridWidth());
         const leftW = panelLeftW();
         const rightW = panelRightW();
-        canvasW = leftW + boardW + rightW;
+        let boardW;
+        if (BOARD_HALF === "left") {
+          canvasW = BOARD1_CANVAS_W;
+          boardW = BOARD1_CANVAS_W - leftW;
+        } else if (BOARD_HALF === "right") {
+          canvasW = BOARD2_CANVAS_W;
+          boardW = BOARD2_CANVAS_W - rightW;
+        } else {
+          boardW = Math.ceil(computeBoardGridWidth());
+          canvasW = leftW + boardW + rightW;
+        }
         const root = document.documentElement;
         root.style.setProperty("--canvas-h", CANVAS_H + "px");
         root.style.setProperty("--canvas-w", canvasW + "px");
@@ -958,9 +999,9 @@
         }
         document.title =
           BOARD_HALF === "left"
-            ? "Split Flap Board — Left (1)"
+            ? "Split Flap Board — Left (1) 3552×1200"
             : BOARD_HALF === "right"
-              ? "Split Flap Board — Right (2)"
+              ? "Split Flap Board — Right (2) 3360×1200"
               : "Split Flap Board";
       }
       function applyAutoFit() {
