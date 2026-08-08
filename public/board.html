@@ -114,6 +114,14 @@
         width: var(--right-panel-w, 1200px);
         border-left: 1px solid rgba(255, 255, 255, 0.08);
       }
+      /* Right board: allow QR to hang below the vestaboard */
+      body.half-right #stage,
+      body.half-right #submit-qr-panel {
+        overflow: visible;
+      }
+      body.half-right {
+        overflow: visible;
+      }
       /*
         Logo stack height = vestaboard height. Logos themselves are capped smaller
         than the board on both axes so they never read larger than the flaps.
@@ -149,22 +157,26 @@
         mix-blend-mode: normal;
         image-rendering: auto;
       }
-      /* QR sits on the logo stack, bottom edge of vestaboard — not canvas bottom */
+      /*
+        QR is positioned on the right panel, starting near the board bottom and
+        allowed to extend below the vestaboard stack.
+      */
       #submit-qr-float {
         position: absolute;
         left: 50%;
-        bottom: 12px;
+        top: calc(var(--board-grid-h, 1200px) - 56px);
+        bottom: auto;
         transform: translateX(-50%);
-        z-index: 2;
-        max-width: calc(100% - 24px);
-        max-height: 28%;
+        z-index: 5;
+        max-width: min(92%, 560px);
+        max-height: none;
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 4px;
-        padding: 6px 8px;
+        gap: 6px;
+        padding: 10px 12px;
         background: rgba(0, 0, 0, 0.82);
-        border-radius: 10px;
+        border-radius: 12px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
         box-sizing: border-box;
       }
@@ -274,10 +286,10 @@
       <div id="submit-qr-panel">
         <div class="panel-logo-stack">
           <img class="panel-logo-full" src="dc-34-logo.avif" alt="DEF CON 34" />
-          <div id="submit-qr-float">
-            <div class="submit-qr-label">Submit a message</div>
-            <div id="submit-qr-container"></div>
-          </div>
+        </div>
+        <div id="submit-qr-float">
+          <div class="submit-qr-label">Submit a message</div>
+          <div id="submit-qr-container"></div>
         </div>
       </div>
     </div>
@@ -948,19 +960,20 @@
       }
       const CANVAS_H = 1200,
         TOP_PAD_BASE = 50,
-        // Left: +5px down (55). Right: +50px down vs base (100).
+        // Left: +5px (55). Right: +50px then +5px more (105).
         TOP_PAD =
           BOARD_HALF === "right"
-            ? TOP_PAD_BASE + 50
+            ? TOP_PAD_BASE + 50 + 5
             : BOARD_HALF === "left"
               ? TOP_PAD_BASE + 5
               : TOP_PAD_BASE,
-        // Left board: ~4% of canvas (~142px) then shift back ~100px → ~42px.
-        // Right keeps 20px.
+        // Left board: ~4% then back ~100px → ~42px. Right: flush to left edge.
         LEFT_PAD =
           BOARD_HALF === "left"
             ? Math.max(0, Math.round(BOARD1_CANVAS_W * 0.04) - 100)
-            : 20,
+            : BOARD_HALF === "right"
+              ? 0
+              : 20,
         TOTAL_H = CANVAS_H + TOP_PAD,
         LEFT_PANEL_W = 720,
         RIGHT_PANEL_W = 1200;
@@ -1055,6 +1068,8 @@
           "half-board",
           BOARD_HALF === "left" || BOARD_HALF === "right",
         );
+        document.body.classList.toggle("half-right", BOARD_HALF === "right");
+        document.body.classList.toggle("half-left", BOARD_HALF === "left");
         document.title =
           BOARD_HALF === "left"
             ? "Split Flap Board — Left (1) 3552×1200"
@@ -1150,7 +1165,6 @@
         }
         floatEl.style.display = "";
         const url = "https://www.obviouslyevil.com/submit.html";
-        // Size against vestaboard height, not full canvas (logos stop at board bottom)
         const boardH =
           parseFloat(
             getComputedStyle(document.documentElement).getPropertyValue(
@@ -1163,15 +1177,13 @@
               "--right-panel-w",
             ),
           ) || RIGHT_PANEL_W;
-        const maxH = boardH * 0.22;
-        const maxW = Math.max(80, panelW * 0.42);
-        const labelH = 14;
-        const chrome = 16;
+        // Large QR that can extend below the vestaboard
+        const maxW = Math.max(200, panelW * 0.78);
         const size = Math.max(
-          72,
-          Math.min(maxH - labelH - chrome, maxW, 200),
+          280,
+          Math.min(boardH * 0.48, maxW, 480),
         );
-        floatEl.style.maxHeight = Math.round(maxH) + "px";
+        floatEl.style.maxWidth = Math.round(maxW) + "px";
         drawQR(container, url, Math.round(size), true);
       }
 
