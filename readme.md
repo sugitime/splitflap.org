@@ -30,6 +30,10 @@
 
 A split-flap display that runs in a browser. The kind you used to see at train stations and airports. Open `board.html` on a TV, scan the QR code with your phone, and your phone becomes the wireless remote.
 
+### TouchDesigner display
+
+A second board client lives in [`touchdesigner/`](touchdesigner/README.md). It registers on the same WebSocket, pulls the same play/clear queue events, and layouts text on the same 96×5 grid. Use it as a perform-mode output next to (or instead of) the web board.
+
 Four files. One Node.js server, a board page, a phone companion, and a standalone design tool. No build step, no frameworks, and a weather.gov integration for live forecast mode.
 
 ## Features

@@ -1,0 +1,9 @@
+{
+  "host": "splitflap-olvv.onrender.com",
+  "useTls": true,
+  "clientName": "touchdesigner",
+  "cols": 96,
+  "rows": 5,
+  "defaultDisplayMs": 20000,
+  "notes": "Copy to config.json and point the TD Host parameter at the same host as the web board."
+}

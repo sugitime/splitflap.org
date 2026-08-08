@@ -524,9 +524,15 @@ wss.on("connection", (ws) => {
       case "register_board": {
         boardWsSet.add(ws);
         ws.role = "board";
+        ws.clientName =
+          typeof msg.name === "string" && msg.name.trim()
+            ? msg.name.trim().slice(0, 64)
+            : "board";
         safeSend(ws, { type: "registered" });
         syncBoardState(ws);
-        console.log(`Board connected (${boardWsSet.size} active)`);
+        console.log(
+          `Board connected (${boardWsSet.size} active) name=${ws.clientName}`,
+        );
         notifyModerator();
         break;
       }
