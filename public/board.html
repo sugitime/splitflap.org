@@ -964,7 +964,7 @@
       }
       const CANVAS_H = 1200,
         // Identical top pad on both halves so board rows line up across screens.
-        HALF_TOP_PAD = 155,
+        HALF_TOP_PAD = 230, // 155 + 75 — both halves shifted down
         TOP_PAD =
           BOARD_HALF === "left" || BOARD_HALF === "right" ? HALF_TOP_PAD : 50,
         // Both halves: no side body pad (left pins right via fitViewport).
