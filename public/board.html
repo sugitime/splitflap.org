@@ -338,6 +338,39 @@
         border: none !important;
         overflow: hidden !important;
       }
+      /* UAT: flat black letter cells — no rocker chrome / ridges / bezels */
+      body.uat-mode .bezel,
+      body.uat-mode .bezel-highlight,
+      body.uat-mode .ridges,
+      body.uat-mode .ridge,
+      body.uat-mode .rocker-split-overlay {
+        display: none !important;
+      }
+      body.uat-mode .vestaboard-grid,
+      body.uat-mode .rocker-scale-wrapper,
+      body.uat-mode .rocker-switch,
+      body.uat-mode .recessed-hole-stroke,
+      body.uat-mode .recessed-hole-bg,
+      body.uat-mode .rocker-top,
+      body.uat-mode .rocker-bot,
+      body.uat-mode .rocker-wrapper-top,
+      body.uat-mode .rocker-wrapper-bot,
+      body.uat-mode .rocker-wrapper-falling,
+      body.uat-mode .rocker-falling-front {
+        background: #000 !important;
+        background-color: #000 !important;
+        background-image: none !important;
+        box-shadow: none !important;
+        filter: none !important;
+        border: none !important;
+        border-radius: 0 !important;
+        -webkit-clip-path: none !important;
+        clip-path: none !important;
+      }
+      body.uat-mode .vestaboard-grid {
+        gap: 0 !important;
+        padding: 0 !important;
+      }
 
     </style>
     <style id="dynamic-board-css"></style>
@@ -422,34 +455,34 @@
         cols: VIEW_COLS,
         rows: 5,
         scale: 0.22,
-        gridGap: 11,
+        gridGap: IS_UAT ? 0 : 11,
         fontFamily: "'Roboto Mono', monospace",
         fontSize: 247,
         fontWeight: 300,
         fontX: 0,
         fontY: -52,
         fontColor: "#ffffff",
-        boardPad: 13,
-        boardShadow: 0.4,
-        boardRadius: 6,
-        boardBg: IS_UAT ? "#000000" : "#0f0f0f",
+        boardPad: IS_UAT ? 0 : 13,
+        boardShadow: IS_UAT ? 0 : 0.4,
+        boardRadius: IS_UAT ? 0 : 6,
+        boardBg: "#000000",
         previewBg: "#000000",
         width: 250,
         height: 540,
         split: 194,
-        pinch: 14,
-        pinchHeight: 54,
-        pinchSlope: 7,
-        outerRadius: 30,
-        bezelRadius: 30,
-        radius: 24,
+        pinch: IS_UAT ? 0 : 14,
+        pinchHeight: IS_UAT ? 0 : 54,
+        pinchSlope: IS_UAT ? 0 : 7,
+        outerRadius: IS_UAT ? 0 : 30,
+        bezelRadius: IS_UAT ? 0 : 30,
+        radius: IS_UAT ? 0 : 24,
         shadow: 0,
-        padBezel: 10,
-        padHole: 24,
-        gap: 7,
+        padBezel: IS_UAT ? 0 : 10,
+        padHole: IS_UAT ? 0 : 24,
+        gap: IS_UAT ? 0 : 7,
         highlightInset: 0,
         strokeW: 0,
-        ridgeCount: 7,
+        ridgeCount: IS_UAT ? 0 : 7,
         ridgeHeight: 7,
         ridgeGap: 1,
         ridgeRadius: 20,
@@ -460,16 +493,16 @@
         r2: "#000000",
         r3: "#000000",
         r4: "#000000",
-        c_bg: "#0f0f0f",
+        c_bg: "#000000",
         c_holeStroke: "#000000",
-        c_holeBg: "#040404",
+        c_holeBg: "#000000",
         g_bezel1: "#000000",
         g_bezel2: "#000000",
-        g_top1: "#0f0f0f",
-        g_top2: "#0f0f0f",
-        g_bot1: "#0f0f0f",
-        g_bot2: "#0f0f0f",
-        g_bot3: "#0f0f0f",
+        g_top1: "#000000",
+        g_top2: "#000000",
+        g_bot1: "#000000",
+        g_bot2: "#000000",
+        g_bot3: "#000000",
         autoFit: true,
       };
       let publicDisplayMs = 20000,
