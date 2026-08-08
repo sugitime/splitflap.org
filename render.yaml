@@ -2,8 +2,9 @@
 # Deploy: connect this repo in the Render dashboard and apply the blueprint,
 # or use "New > Blueprint" and point at this file.
 #
-# Production: splitflap  — branch main only
-# UAT:        splitflap-uat — branch uat only (do not deploy UAT work to prod)
+# Production: splitflap  — branch main; AUTO-DEPLOY OFF (manual only)
+# UAT:        splitflap-uat — branch uat only; auto-deploy on
+# Never push/deploy UAT work to production.
 
 services:
   - type: web
