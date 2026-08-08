@@ -86,20 +86,17 @@
         - overall shrink 3% (scale 0.97)
         - width another 3% → scaleX 0.97 * 0.97 = 0.9409
       */
+      /* Same scale + origin on both halves so vertical alignment matches */
       body.half-board #stage {
         transform: scale(0.9409, 0.97);
+        transform-origin: top left;
       }
-      /* Left screen: pin entire stage to the right edge */
-      body.half-left {
+      /* Left screen: flush pads; horizontal pin handled in fitViewport */
+      body.half-left,
+      body.half-right {
         padding-left: 0 !important;
         padding-right: 0 !important;
-        margin-left: auto;
-        margin-right: 0;
-      }
-      body.half-left #stage {
-        transform-origin: top right;
-        margin-left: auto;
-        margin-right: 0;
+        margin: 0 !important;
       }
 
       #zyn-logo-panel,
@@ -971,13 +968,13 @@
         }
       }
       const CANVAS_H = 1200,
-        TOP_PAD_BASE = 50,
-        // Left and right halves share the same vertical offset (155px).
+        // One shared top pad for body + stage on both half screens (must match).
+        HALF_TOP_PAD = 155,
         TOP_PAD =
           BOARD_HALF === "left" || BOARD_HALF === "right"
-            ? TOP_PAD_BASE + 5 + 100
-            : TOP_PAD_BASE,
-        // Left board: flush right (no left inset). Right: flush left.
+            ? HALF_TOP_PAD
+            : 50,
+        // Both halves: no side body pad (left pins right via fitViewport).
         LEFT_PAD =
           BOARD_HALF === "left" || BOARD_HALF === "right" ? 0 : 20,
         TOTAL_H = CANVAS_H + TOP_PAD,
@@ -1106,32 +1103,50 @@
       }
       function fitViewport() {
         const totalW = canvasW + LEFT_PAD;
+        // Same vertical scale basis for both halves (same TOTAL_H / TOP_PAD).
         const scale = Math.min(
           window.innerWidth / totalW,
           window.innerHeight / TOTAL_H,
         );
-        // Left half: anchor whole page to the right edge of the left screen
+        // Force identical top padding on body for both halves
+        document.body.style.paddingTop = TOP_PAD + "px";
+        document.body.style.paddingLeft = LEFT_PAD + "px";
+        document.body.style.paddingRight = "0";
+        document.body.style.paddingBottom = "0";
+        document.body.style.margin = "0";
+        document.body.style.boxSizing = "border-box";
+        // Always scale from top-left so Y alignment matches left/right
+        document.body.style.transformOrigin = "top left";
+        document.body.style.position = "absolute";
+        document.body.style.top = "0";
+        document.body.style.bottom = "auto";
+
         if (BOARD_HALF === "left") {
-          document.body.style.position = "absolute";
-          document.body.style.top = "0";
-          document.body.style.right = "0";
-          document.body.style.left = "auto";
-          document.body.style.bottom = "auto";
-          document.body.style.margin = "0";
-          document.body.style.transformOrigin = "top right";
+          // Pin whole layout to the right of the left screen (X only)
+          document.body.style.left = "0";
+          document.body.style.right = "auto";
+          const scaledW = totalW * scale;
+          const offsetX = Math.max(0, window.innerWidth - scaledW);
+          document.body.style.transform = `translate(${offsetX}px, 0) scale(${scale})`;
+        } else if (BOARD_HALF === "right") {
+          // Flush left of the right screen
+          document.body.style.left = "0";
+          document.body.style.right = "auto";
+          document.body.style.transform = `scale(${scale})`;
         } else {
           document.body.style.position = "";
-          document.body.style.top = "";
-          document.body.style.right = "";
           document.body.style.left = "";
-          document.body.style.bottom = "";
-          document.body.style.margin = "";
-          document.body.style.transformOrigin = "top left";
+          document.body.style.right = "";
+          document.body.style.top = "";
+          document.body.style.transform = `scale(${scale})`;
         }
-        document.body.style.transform = `scale(${scale})`;
+
         document.documentElement.style.overflow = "hidden";
         document.documentElement.style.height = `${TOTAL_H * scale}px`;
-        document.documentElement.style.width = `${totalW * scale}px`;
+        document.documentElement.style.width =
+          BOARD_HALF === "left"
+            ? `${window.innerWidth}px`
+            : `${totalW * scale}px`;
       }
       window.addEventListener("resize", () => {
         if (S.autoFit) applyAutoFit();
