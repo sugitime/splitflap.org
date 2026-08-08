@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Split Flap Board — Left (board1)</title>
+    <script>
+      // Left half: columns 0–47 + ZYN logo. Stays in sync with board2 via shared WebSocket queue.
+      location.replace("board.html?half=left");
+    </script>
+    <meta http-equiv="refresh" content="0;url=board.html?half=left" />
+  </head>
+  <body
+    style="
+      margin: 0;
+      background: #000;
+      color: #8a8a96;
+      font-family: system-ui, sans-serif;
+      padding: 2rem;
+    "
+  >
+    <p>
+      Loading left half…
+      <a href="board.html?half=left" style="color: #22c55e">Open board1</a>
+    </p>
+  </body>
+</html>

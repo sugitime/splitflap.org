@@ -221,6 +221,9 @@ function notifyModerator() {
 }
 
 function boardPlayPayload(entry, urgent = false) {
+  const now = Date.now();
+  // Small shared delay so multi-screen halves (board1/board2) start together.
+  const syncLeadMs = urgent ? 0 : 80;
   return {
     type: "play_public_message",
     id: entry.id,
@@ -229,6 +232,8 @@ function boardPlayPayload(entry, urgent = false) {
     indefinite: !!entry.indefinite,
     autocenter: !!entry.autocenter,
     urgent: !!urgent,
+    serverTime: now,
+    startAt: now + syncLeadMs,
   };
 }
 
@@ -259,10 +264,13 @@ function advanceBoardAfterPlayingRemoved(removed) {
 
 function clearBoardDisplay(id, urgent = false) {
   if (!boardsOnline()) return;
+  const now = Date.now();
   broadcastToBoards({
     type: "clear_public_message",
     id: id || null,
     urgent: !!urgent,
+    serverTime: now,
+    startAt: now + (urgent ? 0 : 40),
   });
 }
 

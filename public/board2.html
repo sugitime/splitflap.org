@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Split Flap Board — Right (board2)</title>
+    <script>
+      // Right half: columns 48–95 + DC34 logo + QR. Stays in sync with board1 via shared WebSocket queue.
+      location.replace("board.html?half=right");
+    </script>
+    <meta http-equiv="refresh" content="0;url=board.html?half=right" />
+  </head>
+  <body
+    style="
+      margin: 0;
+      background: #000;
+      color: #8a8a96;
+      font-family: system-ui, sans-serif;
+      padding: 2rem;
+    "
+  >
+    <p>
+      Loading right half…
+      <a href="board.html?half=right" style="color: #22c55e">Open board2</a>
+    </p>
+  </body>
+</html>

@@ -7,6 +7,13 @@
       content="width=7632,height=1200,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"
     />
     <title>Split Flap Board</title>
+    <script>
+      // board1.html / board2.html set window.BOARD_HALF before load; URL ?half= also works
+      window.BOARD_HALF =
+        window.BOARD_HALF ||
+        new URLSearchParams(location.search).get("half") ||
+        "full";
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -264,6 +271,16 @@
         return i !== -1 ? i : 0;
       }
 
+      /** full | left | right — left/right each show half of the 96-col board */
+      const BOARD_HALF =
+        window.BOARD_HALF === "left" || window.BOARD_HALF === "right"
+          ? window.BOARD_HALF
+          : "full";
+      const FULL_COLS = 96;
+      const HALF_COLS = 48;
+      const VIEW_COLS = BOARD_HALF === "full" ? FULL_COLS : HALF_COLS;
+      const VIEW_COL_OFFSET = BOARD_HALF === "right" ? HALF_COLS : 0;
+
       const S = {
         animDuration: 360,
         animPerspective: 3000,
@@ -274,7 +291,7 @@
         loopSequence: true,
         soundVolume: 0.8,
         soundRate: 1.5,
-        cols: 96,
+        cols: VIEW_COLS,
         rows: 5,
         scale: 0.22,
         gridGap: 11,
@@ -488,12 +505,15 @@
         return result.slice(0, rows);
       }
       function messageToGrid(msg, autocenter) {
-        const lines = layoutMessageRows(msg, S.cols, S.rows, autocenter),
+        // Always layout on the full 96-col board, then show this view's half.
+        const lines = layoutMessageRows(msg, FULL_COLS, S.rows, autocenter),
           g = [];
         for (let r = 0; r < S.rows; r++) {
           let c = VestaboardText.normalizeGridLine(lines[r] || "");
-          while (c.length < S.cols) c.push(" ");
-          g.push(...c.slice(0, S.cols));
+          while (c.length < FULL_COLS) c.push(" ");
+          c = c.slice(0, FULL_COLS);
+          if (BOARD_HALF === "full") g.push(...c);
+          else g.push(...c.slice(VIEW_COL_OFFSET, VIEW_COL_OFFSET + VIEW_COLS));
         }
         return g;
       }
@@ -621,7 +641,8 @@
       }
       function getDelay(idx) {
         return (
-          (idx % S.cols) * S.animStagger +
+          // Use global column so left/right halves stagger continuously across the seam
+          ((idx % S.cols) + VIEW_COL_OFFSET) * S.animStagger +
           Math.floor(idx / S.cols) * S.animStagger * 1.5
         );
       }
@@ -884,6 +905,12 @@
         LEFT_PANEL_W = 720,
         RIGHT_PANEL_W = 1200;
       let canvasW = 7632;
+      function panelLeftW() {
+        return BOARD_HALF === "right" ? 0 : LEFT_PANEL_W;
+      }
+      function panelRightW() {
+        return BOARD_HALF === "left" ? 0 : RIGHT_PANEL_W;
+      }
       function computeBoardScale() {
         const pad = S.boardPad * 2;
         const gapH = (S.rows - 1) * S.gridGap;
@@ -902,12 +929,14 @@
       function syncCanvasLayout() {
         const boardH = Math.ceil(computeBoardGridHeight());
         const boardW = Math.ceil(computeBoardGridWidth());
-        canvasW = LEFT_PANEL_W + boardW + RIGHT_PANEL_W;
+        const leftW = panelLeftW();
+        const rightW = panelRightW();
+        canvasW = leftW + boardW + rightW;
         const root = document.documentElement;
         root.style.setProperty("--canvas-h", CANVAS_H + "px");
         root.style.setProperty("--canvas-w", canvasW + "px");
-        root.style.setProperty("--left-panel-w", LEFT_PANEL_W + "px");
-        root.style.setProperty("--right-panel-w", RIGHT_PANEL_W + "px");
+        root.style.setProperty("--left-panel-w", leftW + "px");
+        root.style.setProperty("--right-panel-w", rightW + "px");
         root.style.setProperty("--board-area-w", boardW + "px");
         root.style.setProperty("--board-grid-h", boardH + "px");
         const viewport = document.querySelector('meta[name="viewport"]');
@@ -917,6 +946,22 @@
             `width=${canvasW},height=${CANVAS_H},initial-scale=1.0,maximum-scale=1.0,user-scalable=no`,
           );
         }
+      }
+      function applyHalfPanels() {
+        const zyn = document.getElementById("zyn-logo-panel");
+        const qr = document.getElementById("submit-qr-panel");
+        if (zyn) {
+          zyn.style.display = BOARD_HALF === "right" ? "none" : "";
+        }
+        if (qr) {
+          qr.style.display = BOARD_HALF === "left" ? "none" : "";
+        }
+        document.title =
+          BOARD_HALF === "left"
+            ? "Split Flap Board — Left (1)"
+            : BOARD_HALF === "right"
+              ? "Split Flap Board — Right (2)"
+              : "Split Flap Board";
       }
       function applyAutoFit() {
         if (!S.autoFit) return;
@@ -1011,6 +1056,21 @@
           clearTimeout(publicQueueTimer);
           publicQueueTimer = null;
         }
+        if (publicSyncTimer) {
+          clearTimeout(publicSyncTimer);
+          publicSyncTimer = null;
+        }
+      }
+
+      let publicSyncTimer = null;
+      /** Estimated serverNow - localNow (ms), updated from each message. */
+      let clockOffsetMs = 0;
+
+      function localDelayUntil(serverTimestamp) {
+        if (!serverTimestamp) return 0;
+        // local time when server clock hits serverTimestamp
+        const localTarget = serverTimestamp - clockOffsetMs;
+        return Math.max(0, localTarget - Date.now());
       }
 
       function finishPublicMessage(id) {
@@ -1023,7 +1083,7 @@
         }
       }
 
-      function clearPublicMessage(id, urgent) {
+      function clearPublicMessage(id, urgent, startAt) {
         if (
           !urgent &&
           id &&
@@ -1032,10 +1092,16 @@
         ) {
           return;
         }
-        publicQueuePlaying = false;
-        currentPublicMessageId = null;
+        const run = () => {
+          publicQueuePlaying = false;
+          currentPublicMessageId = null;
+          clearPublicQueueTimer();
+          flipToTarget(blankGrid(), () => {});
+        };
         clearPublicQueueTimer();
-        flipToTarget(blankGrid(), () => {});
+        const delay = localDelayUntil(startAt);
+        if (delay > 0) publicSyncTimer = setTimeout(run, delay);
+        else run();
       }
 
       function playPublicMessage(
@@ -1044,20 +1110,34 @@
         id,
         indefinite,
         autocenter,
+        startAt,
       ) {
         clearPublicQueueTimer();
-        publicQueuePlaying = true;
-        currentPublicMessageId = id;
-        const ms = indefinite
-          ? 0
-          : durationMs > 0
-            ? durationMs
-            : publicDisplayMs;
-        flipToTarget(messageToGrid(text, autocenter), () => {
-          if (!indefinite && ms > 0) {
-            publicQueueTimer = setTimeout(() => finishPublicMessage(id), ms);
-          }
-        });
+        const run = () => {
+          publicQueuePlaying = true;
+          currentPublicMessageId = id;
+          const ms = indefinite
+            ? 0
+            : durationMs > 0
+              ? durationMs
+              : publicDisplayMs;
+          // Hold for full duration from synchronized start (not from flip end)
+          const holdMs = ms;
+          const startedAt = Date.now();
+          flipToTarget(messageToGrid(text, autocenter), () => {
+            if (!indefinite && holdMs > 0) {
+              const elapsed = Date.now() - startedAt;
+              const remain = Math.max(0, holdMs - elapsed);
+              publicQueueTimer = setTimeout(
+                () => finishPublicMessage(id),
+                remain,
+              );
+            }
+          });
+        };
+        const delay = localDelayUntil(startAt);
+        if (delay > 0) publicSyncTimer = setTimeout(run, delay);
+        else run();
       }
 
       let ws = null,
@@ -1067,7 +1147,13 @@
         const proto = location.protocol === "https:" ? "wss:" : "ws:";
         ws = new WebSocket(`${proto}//${location.host}`);
         ws.onopen = () => {
-          ws.send(JSON.stringify({ type: "register_board" }));
+          const name =
+            BOARD_HALF === "left"
+              ? "board1-left"
+              : BOARD_HALF === "right"
+                ? "board2-right"
+                : "board-full";
+          ws.send(JSON.stringify({ type: "register_board", name }));
         };
         ws.onmessage = (e) => {
           let msg;
@@ -1079,6 +1165,9 @@
           if (msg.type === "registered") {
             generateSubmitQR();
           }
+          if (msg.serverTime) {
+            clockOffsetMs = msg.serverTime - Date.now();
+          }
           if (msg.type === "play_public_message" && typeof msg.text === "string") {
             getAudioCtx();
             playPublicMessage(
@@ -1087,10 +1176,11 @@
               msg.id,
               !!msg.indefinite,
               !!msg.autocenter,
+              msg.startAt,
             );
           }
           if (msg.type === "clear_public_message") {
-            clearPublicMessage(msg.id, !!msg.urgent);
+            clearPublicMessage(msg.id, !!msg.urgent, msg.startAt);
           }
         };
         ws.onclose = () => {
@@ -1112,6 +1202,7 @@
       });
       document.addEventListener("click", () => getAudioCtx(), { once: true });
 
+      applyHalfPanels();
       if (S.autoFit) S.scale = computeBoardScale();
       renderBoard();
       lastStructKey = `${S.cols}|${S.rows}|${S.ridgeCount}`;
