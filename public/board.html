@@ -13,14 +13,6 @@
         window.BOARD_HALF ||
         new URLSearchParams(location.search).get("half") ||
         "full";
-      // UAT host (splitflap-uat.onrender.com) or ?uat=1 — logos off, pure black bg
-      window.IS_UAT =
-        window.IS_UAT === true ||
-        /uat/i.test(location.hostname) ||
-        new URLSearchParams(location.search).get("uat") === "1";
-      if (window.IS_UAT) {
-        document.documentElement.classList.add("uat-mode");
-      }
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -309,36 +301,6 @@
         contain: layout style paint;
       }
 
-      /*
-        UAT only: no side logos (ZYN / DC34 / QR), pure black page background.
-        Activated via hostname *uat* or ?uat=1 (see window.IS_UAT).
-      */
-      html.uat-mode,
-      html.uat-mode body,
-      body.uat-mode,
-      body.uat-mode #stage,
-      body.uat-mode .board-area,
-      body.uat-mode #zyn-logo-panel,
-      body.uat-mode #submit-qr-panel {
-        background: #000 !important;
-        background-color: #000 !important;
-      }
-      body.uat-mode #zyn-logo-panel,
-      body.uat-mode #submit-qr-panel,
-      body.uat-mode .panel-logo-stack,
-      body.uat-mode .panel-logo-zyn,
-      body.uat-mode .panel-logo-full,
-      body.uat-mode #submit-qr-float {
-        display: none !important;
-      }
-      body.uat-mode #zyn-logo-panel,
-      body.uat-mode #submit-qr-panel {
-        flex: 0 0 0 !important;
-        width: 0 !important;
-        border: none !important;
-        overflow: hidden !important;
-      }
-
     </style>
     <style id="dynamic-board-css"></style>
   </head>
@@ -387,8 +349,6 @@
         window.BOARD_HALF === "left" || window.BOARD_HALF === "right"
           ? window.BOARD_HALF
           : "full";
-      /** UAT: no brand logos, solid black chrome around the flaps */
-      const IS_UAT = window.IS_UAT === true;
       // Target stage sizes for dual-output (sum = 6912, classic wall width)
       const BOARD1_CANVAS_W = 3552; // left screen: ZYN + left board segment
       const BOARD2_CANVAS_W = 3360; // right screen: right board segment + DC34/QR
@@ -432,7 +392,7 @@
         boardPad: 13,
         boardShadow: 0.4,
         boardRadius: 6,
-        boardBg: IS_UAT ? "#000000" : "#0f0f0f",
+        boardBg: "#0f0f0f",
         previewBg: "#000000",
         width: 250,
         height: 540,
@@ -1047,17 +1007,15 @@
             ? BOARD2_CANVAS_W
             : 7632;
       function panelLeftW() {
-        if (IS_UAT) return 0;
         return BOARD_HALF === "right" ? 0 : LEFT_PANEL_W;
       }
       function panelRightW() {
-        if (IS_UAT) return 0;
         return BOARD_HALF === "left" ? 0 : RIGHT_PANEL_W;
       }
       /** Fixed board-area width for split screens; null for full board (derived from scale). */
       function targetBoardAreaW() {
-        if (BOARD_HALF === "left") return BOARD1_CANVAS_W - panelLeftW();
-        if (BOARD_HALF === "right") return BOARD2_CANVAS_W - panelRightW();
+        if (BOARD_HALF === "left") return BOARD1_CANVAS_W - LEFT_PANEL_W; // 2832
+        if (BOARD_HALF === "right") return BOARD2_CANVAS_W - RIGHT_PANEL_W; // 2160
         return null;
       }
       /**
@@ -1068,8 +1026,8 @@
         const pad = S.boardPad * 2;
         const gapH = (S.rows - 1) * S.gridGap;
         const scaleH = (CANVAS_H - pad - gapH) / (S.rows * S.height);
-        const leftArea = BOARD1_CANVAS_W - (IS_UAT ? 0 : LEFT_PANEL_W);
-        const rightArea = BOARD2_CANVAS_W - (IS_UAT ? 0 : RIGHT_PANEL_W);
+        const leftArea = BOARD1_CANVAS_W - LEFT_PANEL_W;
+        const rightArea = BOARD2_CANVAS_W - RIGHT_PANEL_W;
         const gapWLeft = Math.max(0, LEFT_VIEW_COLS - 1) * S.gridGap;
         const gapWRight = Math.max(0, RIGHT_VIEW_COLS - 1) * S.gridGap;
         const scaleWLeft =
@@ -1139,32 +1097,24 @@
       function applyHalfPanels() {
         const zyn = document.getElementById("zyn-logo-panel");
         const qr = document.getElementById("submit-qr-panel");
-        if (IS_UAT) {
-          if (zyn) zyn.style.display = "none";
-          if (qr) qr.style.display = "none";
-        } else {
-          if (zyn) {
-            zyn.style.display = BOARD_HALF === "right" ? "none" : "";
-          }
-          if (qr) {
-            qr.style.display = BOARD_HALF === "left" ? "none" : "";
-          }
+        if (zyn) {
+          zyn.style.display = BOARD_HALF === "right" ? "none" : "";
         }
-        document.body.classList.toggle("uat-mode", IS_UAT);
-        document.documentElement.classList.toggle("uat-mode", IS_UAT);
+        if (qr) {
+          qr.style.display = BOARD_HALF === "left" ? "none" : "";
+        }
         document.body.classList.toggle(
           "half-board",
           BOARD_HALF === "left" || BOARD_HALF === "right",
         );
         document.body.classList.toggle("half-right", BOARD_HALF === "right");
         document.body.classList.toggle("half-left", BOARD_HALF === "left");
-        const halfTitle =
+        document.title =
           BOARD_HALF === "left"
             ? "Split Flap Board — Left (1) 3552×1200"
             : BOARD_HALF === "right"
               ? "Split Flap Board — Right (2) 3360×1200"
               : "Split Flap Board";
-        document.title = IS_UAT ? halfTitle + " [UAT]" : halfTitle;
       }
       function applyAutoFit() {
         if (!S.autoFit) return;
