@@ -2,13 +2,14 @@
 # Deploy: connect this repo in the Render dashboard and apply the blueprint,
 # or use "New > Blueprint" and point at this file.
 #
-# Production: splitflap (live boards)
-# UAT:        splitflap-uat (isolated test instance, free plan)
+# Production: splitflap  — branch main only
+# UAT:        splitflap-uat — branch uat only (do not deploy UAT work to prod)
 
 services:
   - type: web
     name: splitflap
     runtime: docker
+    branch: main
     dockerfilePath: ./Dockerfile
     plan: free
     healthCheckPath: /api/health
@@ -28,6 +29,7 @@ services:
   - type: web
     name: splitflap-uat
     runtime: docker
+    branch: uat
     dockerfilePath: ./Dockerfile
     plan: free
     healthCheckPath: /api/health
