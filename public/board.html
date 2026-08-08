@@ -69,10 +69,10 @@
         overflow: hidden;
       }
 
-      #submit-qr-panel {
+      #zyn-logo-panel {
         position: relative;
-        flex: 0 0 var(--left-panel-w, 1200px);
-        width: var(--left-panel-w, 1200px);
+        flex: 0 0 var(--left-panel-w, 720px);
+        width: var(--left-panel-w, 720px);
         height: var(--canvas-h, 1200px);
         background: #000;
         border-right: 1px solid rgba(255, 255, 255, 0.08);
@@ -81,12 +81,13 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: flex-start;
+        justify-content: center;
+        padding: 24px;
       }
-      #right-logo-panel {
+      #submit-qr-panel {
         position: relative;
-        flex: 0 0 var(--right-panel-w, 720px);
-        width: var(--right-panel-w, 720px);
+        flex: 0 0 var(--right-panel-w, 1200px);
+        width: var(--right-panel-w, 1200px);
         height: var(--canvas-h, 1200px);
         background: #000;
         border-left: 1px solid rgba(255, 255, 255, 0.08);
@@ -95,8 +96,7 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: center;
-        padding: 24px;
+        justify-content: flex-start;
       }
       .panel-logo-full {
         display: block;
@@ -108,7 +108,7 @@
         object-position: center top;
         flex: 0 0 auto;
       }
-      .panel-logo-right {
+      .panel-logo-zyn {
         display: block;
         width: auto;
         max-width: 100%;
@@ -230,18 +230,18 @@
   </head>
   <body>
     <div id="stage">
+      <div id="zyn-logo-panel">
+        <img class="panel-logo-zyn" src="ZYN_WIC_Logo.png" alt="ZYN When It Clicks" />
+      </div>
+      <div class="board-area" id="board-area">
+        <div id="vestaboard-wrapper"></div>
+      </div>
       <div id="submit-qr-panel">
         <img class="panel-logo-full" src="dc-34-logo.avif" alt="DEF CON 34" />
         <div id="submit-qr-float">
           <div class="submit-qr-label">Submit a message</div>
           <div id="submit-qr-container"></div>
         </div>
-      </div>
-      <div class="board-area" id="board-area">
-        <div id="vestaboard-wrapper"></div>
-      </div>
-      <div id="right-logo-panel">
-        <img class="panel-logo-right" src="ZYN_WIC_Logo.png" alt="ZYN When It Clicks" />
       </div>
     </div>
 
@@ -881,8 +881,8 @@
         }
       }
       const CANVAS_H = 1200,
-        LEFT_PANEL_W = 1200,
-        RIGHT_PANEL_W = 720;
+        LEFT_PANEL_W = 720,
+        RIGHT_PANEL_W = 1200;
       let canvasW = 7632;
       function computeBoardScale() {
         const pad = S.boardPad * 2;
