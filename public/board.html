@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=7632,height=1200,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"
+      content="width=7632,height=1400,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"
     />
     <title>Split Flap Board</title>
     <script>
@@ -60,13 +60,15 @@
       html,
       body {
         width: var(--canvas-w, 7632px);
-        height: var(--canvas-h, 1200px);
+        height: var(--total-h, 1400px);
         margin: 0;
         padding: 0;
+        padding-top: var(--top-pad, 200px);
         overflow: hidden;
         background: #000;
         font-family: "Inter", sans-serif;
         user-select: none;
+        box-sizing: border-box;
       }
       #stage {
         display: flex;
@@ -933,6 +935,8 @@
         }
       }
       const CANVAS_H = 1200,
+        TOP_PAD = 200,
+        TOTAL_H = CANVAS_H + TOP_PAD,
         LEFT_PANEL_W = 720,
         RIGHT_PANEL_W = 1200;
       let canvasW =
@@ -990,7 +994,9 @@
           canvasW = leftW + boardW + rightW;
         }
         const root = document.documentElement;
+        root.style.setProperty("--top-pad", TOP_PAD + "px");
         root.style.setProperty("--canvas-h", CANVAS_H + "px");
+        root.style.setProperty("--total-h", TOTAL_H + "px");
         root.style.setProperty("--canvas-w", canvasW + "px");
         root.style.setProperty("--left-panel-w", leftW + "px");
         root.style.setProperty("--right-panel-w", rightW + "px");
@@ -1004,7 +1010,7 @@
         if (viewport) {
           viewport.setAttribute(
             "content",
-            `width=${canvasW},height=${CANVAS_H},initial-scale=1.0,maximum-scale=1.0,user-scalable=no`,
+            `width=${canvasW},height=${TOTAL_H},initial-scale=1.0,maximum-scale=1.0,user-scalable=no`,
           );
         }
       }
@@ -1048,12 +1054,12 @@
       function fitViewport() {
         const scale = Math.min(
           window.innerWidth / canvasW,
-          window.innerHeight / CANVAS_H,
+          window.innerHeight / TOTAL_H,
         );
         document.body.style.transform = `scale(${scale})`;
         document.body.style.transformOrigin = "top left";
         document.documentElement.style.overflow = "hidden";
-        document.documentElement.style.height = `${CANVAS_H * scale}px`;
+        document.documentElement.style.height = `${TOTAL_H * scale}px`;
         document.documentElement.style.width = `${canvasW * scale}px`;
       }
       window.addEventListener("resize", () => {
