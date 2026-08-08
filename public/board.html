@@ -138,6 +138,10 @@
         width: var(--right-panel-w, 1200px);
         border-left: 1px solid rgba(255, 255, 255, 0.08);
       }
+      /* Match vestaboard 100px drop — right logos + QR only */
+      #submit-qr-panel .panel-logo-stack {
+        margin-top: 100px;
+      }
       /* Right board: allow QR to hang below the vestaboard */
       body.half-right #stage,
       body.half-right #submit-qr-panel {
@@ -188,7 +192,8 @@
       #submit-qr-float {
         position: absolute;
         left: 50%;
-        top: calc(var(--board-grid-h, 1200px) - 56px);
+        /* +100px to track the right logo / vestaboard vertical offset */
+        top: calc(var(--board-grid-h, 1200px) - 56px + 100px);
         bottom: auto;
         transform: translateX(-50%);
         z-index: 5;
